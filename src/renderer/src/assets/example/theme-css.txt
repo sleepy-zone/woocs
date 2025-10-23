@@ -36,54 +36,6 @@ blockquote {
 /* 引用段落样式 */
 blockquote_p {
 }
-/* GFM note 样式 */
-blockquote_note {
-}
-/* GFM tip 样式 */
-blockquote_tip {
-}
-/* GFM important 样式 */
-blockquote_important {
-}
-/* GFM warning 样式 */
-blockquote_warning {
-}
-/* GFM caution 样式 */
-blockquote_caution {
-}
-/* GFM 通用标题 */
-blockquote_title {
-}
-/* GFM note 标题 */
-blockquote_title_note {
-}
-/* GFM tip 标题 */
-blockquote_title_tip {
-}
-/* GFM important 标题 */
-blockquote_title_important {
-}
-/* GFM warning 标题 */
-blockquote_title_warning {
-}
-/* GFM caution 标题 */
-blockquote_title_caution {
-}
-/* GFM note 段落样式 */
-blockquote_p_note {
-}
-/* GFM tip 段落样式 */
-blockquote_p_tip {
-}
-/* GFM important 段落样式 */
-blockquote_p_important {
-}
-/* GFM warning 段落样式 */
-blockquote_p_warning {
-}
-/* GFM caution 段落样式 */
-blockquote_p_caution {
-}
 /* 段落样式 */
 p {
 }
@@ -92,6 +44,9 @@ hr {
 }
 /* 行内代码样式 */
 codespan {
+}
+/* 斜体样式 */
+em {
 }
 /* 粗体样式 */
 strong {
@@ -116,4 +71,80 @@ code {
 }
 /* 代码块外层样式 */
 code_pre {
+}
+/* 行内公式样式 */
+inline_katex {
+}
+/* 公式块样式 */
+block_katex {
+}
+/* 表格样式 */
+table {
+}
+/* 表格头样式 */
+thead{
+}
+/* 表格标题格样式 */
+th {
+}
+/* 表格内容格样式 */
+td {
+}
+
+/* GFM note 样式 */
+blockquote_note {
+}
+/* GFM tip 样式 */
+blockquote_tip {
+}
+/* GFM info 样式 */
+blockquote_info {
+}
+/* GFM important 样式 */
+blockquote_important {
+}
+/* GFM warning 样式 */
+blockquote_warning {
+}
+/* GFM caution 样式 */
+blockquote_caution {
+}
+/* GFM 通用标题 */
+blockquote_title {
+}
+/* GFM note 标题 */
+blockquote_title_note {
+}
+/* GFM tip 标题 */
+blockquote_title_tip {
+}
+/* GFM info 标题 */
+blockquote_title_info {
+}
+/* GFM important 标题 */
+blockquote_title_important {
+}
+/* GFM warning 标题 */
+blockquote_title_warning {
+}
+/* GFM caution 标题 */
+blockquote_title_caution {
+}
+/* GFM note 段落样式 */
+blockquote_p_note {
+}
+/* GFM tip 段落样式 */
+blockquote_p_tip {
+}
+/* GFM info 段落样式 */
+blockquote_p_info {
+}
+/* GFM important 段落样式 */
+blockquote_p_important {
+}
+/* GFM warning 段落样式 */
+blockquote_p_warning {
+}
+/* GFM caution 段落样式 */
+blockquote_p_caution {
 }

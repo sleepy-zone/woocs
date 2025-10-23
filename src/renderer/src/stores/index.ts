@@ -1,13 +1,54 @@
-import type { ReadTimeResults } from 'reading-time'
-import DEFAULT_CONTENT from '@renderer/assets/example/markdown.md?raw'
-import DEFAULT_CSS_CONTENT from '@renderer/assets/example/theme-css.txt?raw'
-import { altKey, codeBlockThemeOptions, colorOptions, fontFamilyOptions, fontSizeOptions, legendOptions, shiftKey, themeMap, themeOptions } from '@renderer/config'
-import { addPrefix, css2json, customCssWithTemplate, customizeTheme, downloadMD, exportHTML, formatDoc } from '@renderer/utils'
+import type { EditorView } from '@codemirror/view'
+import { Compartment, EditorState } from '@codemirror/state'
+import { EditorView as CMEditorView } from '@codemirror/view'
+import { initRenderer } from '@md/core'
+import {
+  defaultStyleConfig,
+  themeMap,
+  widthOptions,
+} from '@md/shared/configs'
+import { cssSetup, theme as editorTheme } from '@md/shared/editor'
+import { toPng } from 'html-to-image'
+import { v4 as uuid } from 'uuid'
+import DEFAULT_CONTENT from '@/assets/example/markdown.md?raw'
 
-import { initRenderer } from '@renderer/utils/renderer'
-import CodeMirror from 'codemirror'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import DEFAULT_CSS_CONTENT from '@/assets/example/theme-css.txt?raw'
+import {
+  addPrefix,
+  css2json,
+  customCssWithTemplate,
+  customizeTheme,
+  downloadFile,
+  downloadMD,
+  exportHTML,
+  exportPDF,
+  exportPureHTML,
+  formatDoc,
+  postProcessHtml,
+  processHtmlContent,
+  renderMarkdown,
+  sanitizeTitle,
+} from '@/utils'
+import { copyPlain } from '@/utils/clipboard'
+
+/**********************************
+ * Post 结构接口
+ *********************************/
+interface Post {
+  id: string
+  title: string
+  content: string
+  history: {
+    datetime: string
+    content: string
+  }[]
+  createDatetime: Date
+  updateDatetime: Date
+  // 父标签
+  parentId?: string | null
+  // 展开状态
+  collapsed?: boolean
+}
 
 export const useStore = defineStore(`store`, () => {
   // 是否开启深色模式
@@ -15,107 +56,219 @@ export const useStore = defineStore(`store`, () => {
   const toggleDark = useToggle(isDark)
 
   // 是否开启 Mac 代码块
-  const isMacCodeBlock = useStorage(`isMacCodeBlock`, true)
+  const isMacCodeBlock = useStorage(`isMacCodeBlock`, defaultStyleConfig.isMacCodeBlock)
   const toggleMacCodeBlock = useToggle(isMacCodeBlock)
+
+  // 是否开启代码块行号显示
+  const isShowLineNumber = useStorage(`isShowLineNumber`, defaultStyleConfig.isShowLineNumber)
+  const toggleShowLineNumber = useToggle(isShowLineNumber)
 
   // 是否在左侧编辑
   const isEditOnLeft = useStorage(`isEditOnLeft`, true)
   const toggleEditOnLeft = useToggle(isEditOnLeft)
 
   // 是否开启微信外链接底部引用
-  const isCiteStatus = useStorage(`isCiteStatus`, false)
+  const isCiteStatus = useStorage(`isCiteStatus`, defaultStyleConfig.isCiteStatus)
   const toggleCiteStatus = useToggle(isCiteStatus)
 
+  // 是否开启 AI 工具箱
+  const showAIToolbox = useStorage(`showAIToolbox`, true)
+  const toggleAIToolbox = useToggle(showAIToolbox)
+
   // 是否统计字数和阅读时间
-  const isCountStatus = useStorage(`isCountStatus`, false)
+  const isCountStatus = useStorage(`isCountStatus`, defaultStyleConfig.isCountStatus)
   const toggleCountStatus = useToggle(isCountStatus)
 
   // 是否开启段落首行缩进
   const isUseIndent = useStorage(addPrefix(`use_indent`), false)
   const toggleUseIndent = useToggle(isUseIndent)
 
+  const isUseJustify = useStorage(addPrefix(`use_justify`), false)
+  const toggleUseJustify = useToggle(isUseJustify)
+
   const output = ref(``)
 
   // 文本字体
-  const theme = useStorage<keyof typeof themeMap>(addPrefix(`theme`), themeOptions[0].value)
+  const theme = useStorage<keyof typeof themeMap>(addPrefix(`theme`), defaultStyleConfig.theme)
   // 文本字体
-  const fontFamily = useStorage(`fonts`, fontFamilyOptions[0].value)
+  const fontFamily = useStorage(`fonts`, defaultStyleConfig.fontFamily)
   // 文本大小
-  const fontSize = useStorage(`size`, fontSizeOptions[2].value)
+  const fontSize = useStorage(`size`, defaultStyleConfig.fontSize)
   // 主色
-  const primaryColor = useStorage(`color`, colorOptions[0].value)
+  const primaryColor = useStorage(`color`, defaultStyleConfig.primaryColor)
   // 代码块主题
-  const codeBlockTheme = useStorage(`codeBlockTheme`, codeBlockThemeOptions[23].value)
+  const codeBlockTheme = useStorage(`codeBlockTheme`, defaultStyleConfig.codeBlockTheme)
   // 图注格式
-  const legend = useStorage(`legend`, legendOptions[3].value)
+  const legend = useStorage(`legend`, defaultStyleConfig.legend)
+
+  // 预览宽度
+  const previewWidth = useStorage(`previewWidth`, widthOptions[0].value)
 
   const fontSizeNumber = computed(() => Number(fontSize.value.replace(`px`, ``)))
 
-  // 内容编辑器编辑器
-  const editor = ref<CodeMirror.EditorFromTextArea | null>(null)
-  // 编辑区域内容
-  // 预备弃用
-  const editorContent = useStorage(`__editor_content`, '')
+  // 内容编辑器
+  const editor = ref<EditorView | null>(null)
+  // 预备弃用的旧字段
+  const editorContent = useStorage(`__editor_content`, DEFAULT_CONTENT)
 
   const isOpenRightSlider = useStorage(addPrefix(`is_open_right_slider`), false)
+  const isOpenPostSlider = useStorage(addPrefix(`is_open_post_slider`), false)
 
-  const isOpenPostSlider = useStorage(addPrefix(`is_open_post_slider`), true)
-  // 内容列表
-  const posts = useStorage(addPrefix(`posts`), [{
-    title: '探索 Markdown',
-    // content: DEFAULT_CONTENT,
-    filePath: '探索 Markdown.md'
-  }])
-  // 当前内容
-  const currentPostIndex = useStorage(addPrefix(`current_post_index`), 0)
+  /*******************************
+   * 内容列表 posts：默认就带 id
+   ******************************/
+  const posts = useStorage<Post[]>(addPrefix(`posts`), [
+    {
+      id: uuid(),
+      title: `内容1`,
+      content: DEFAULT_CONTENT,
+      history: [
+        { datetime: new Date().toLocaleString(`zh-cn`), content: DEFAULT_CONTENT },
+      ],
+      createDatetime: new Date(),
+      updateDatetime: new Date(),
+    },
+  ])
 
-  const addPost = async (title: string) => {
-    const defaultContent = `# ${title}`
+  // currentPostId 先存空串
+  const currentPostId = useStorage(addPrefix(`current_post_id`), ``)
 
-    // 写入本地文件
-    const res = await window.$api.addPost2Local(title, defaultContent);
+  // 是否为移动端
+  const isMobile = useStorage(`isMobile`, false)
 
-    if (res) {
-      currentPostIndex.value = posts.value.push({
-        title,
-        // content: defaultContent,
-        filePath: res
-      }) - 1
-    }
-
-    return res;
+  function handleResize() {
+    isMobile.value = window.innerWidth <= 768
   }
 
-  const renamePost = async (index: number, title: string) => {
-    const res = await window.$api.renamePost(posts.value[index].title, title);
-    if (res) {
-      posts.value[index].title = title
-      posts.value[index].filePath = res
+  onMounted(() => {
+    handleResize()
+    window.addEventListener(`resize`, handleResize)
+  })
+
+  onBeforeUnmount(() => {
+    window.removeEventListener(`resize`, handleResize)
+  })
+
+  // 在补齐 id 后，若 currentPostId 无效 ➜ 自动指向第一篇
+  onBeforeMount(() => {
+    posts.value = posts.value.map((post, index) => {
+      const now = Date.now()
+      return {
+        ...post,
+        id: post.id ?? uuid(),
+        createDatetime: post.createDatetime ?? new Date(now + index),
+        updateDatetime: post.updateDatetime ?? new Date(now + index),
+      }
+    })
+
+    // 兼容：如果本地没有 currentPostId，或指向的文章已不存在
+    if (!currentPostId.value || !posts.value.some(p => p.id === currentPostId.value)) {
+      currentPostId.value = posts.value[0]?.id ?? ``
     }
-    return res
+  })
+
+  /** 根据 id 找索引 */
+  const findIndexById = (id: string) => posts.value.findIndex(p => p.id === id)
+
+  /** computed: 让旧代码还能用 index，但底层映射 id */
+  const currentPostIndex = computed<number>({
+    get: () => findIndexById(currentPostId.value),
+    set: (idx) => {
+      if (idx >= 0 && idx < posts.value.length)
+        currentPostId.value = posts.value[idx].id
+    },
+  })
+
+  /** 获取 Post */
+  const getPostById = (id: string) => posts.value.find(p => p.id === id)
+
+  /********************************
+   * CRUD
+   ********************************/
+  const addPost = (title: string, parentId: string | null = null) => {
+    const newPost: Post = {
+      id: uuid(),
+      title,
+      content: `# ${title}`,
+      history: [
+        { datetime: new Date().toLocaleString(`zh-cn`), content: `# ${title}` },
+      ],
+      createDatetime: new Date(),
+      updateDatetime: new Date(),
+      parentId,
+    }
+    posts.value.push(newPost)
+    currentPostId.value = newPost.id
   }
 
-  const delPost = async (index: number) => {
-    const res = await window.$api.removePost(posts.value[index].title);
-    if (res) {
-      posts.value.splice(index, 1)
-      currentPostIndex.value = Math.min(index, posts.value.length - 1)
-    }
-    return res
+  const renamePost = (id: string, title: string) => {
+    const post = getPostById(id)
+    if (post)
+      post.title = title
   }
 
-  watch(currentPostIndex, async () => {
-    const c = await window.$api.getPost(posts.value[currentPostIndex.value].title)
-    toRaw(editor.value!).setValue(c)
+  const delPost = (id: string) => {
+    const idx = findIndexById(id)
+    if (idx === -1)
+      return
+    posts.value.splice(idx, 1)
+    currentPostId.value = posts.value[Math.min(idx, posts.value.length - 1)]?.id ?? ``
+  }
+
+  const updatePostParentId = (postId: string, parentId: string | null) => {
+    const post = getPostById(postId)
+    if (post) {
+      post.parentId = parentId
+      post.updateDatetime = new Date()
+    }
+  }
+
+  // 收起所有文章
+  const collapseAllPosts = () => {
+    posts.value.forEach((post) => {
+      post.collapsed = true
+    })
+  }
+
+  // 展开所有文章
+  const expandAllPosts = () => {
+    posts.value.forEach((post) => {
+      post.collapsed = false
+    })
+  }
+
+  /********************************
+   * 同步编辑器内容
+   ********************************/
+  watch(currentPostId, () => {
+    const post = getPostById(currentPostId.value)
+    if (post && editor.value) {
+      editor.value.dispatch({
+        changes: { from: 0, to: editor.value.state.doc.length, insert: post.content },
+      })
+    }
+  })
+
+  onMounted(() => {
+    // 迁移阶段，兼容之前的方案
+    if (editorContent.value !== DEFAULT_CONTENT) {
+      const post = getPostById(currentPostId.value)
+      if (post)
+        post.content = editorContent.value
+      editorContent.value = DEFAULT_CONTENT
+    }
   })
 
   // 格式化文档
   const formatContent = () => {
-    formatDoc((editor.value!).getValue()).then(async (doc) => {
-      // posts.value[currentPostIndex.value].content = doc
-      await window.$api.updatePost(posts.value[currentPostIndex.value].title, doc);
-      toRaw(editor.value!).setValue(doc)
-    })
+    if (editor.value) {
+      formatDoc(editor.value.state.doc.toString()).then((doc) => {
+        posts.value[currentPostIndex.value].content = doc
+        editor.value!.dispatch({
+          changes: { from: 0, to: editor.value!.state.doc.length, insert: doc },
+        })
+      })
+    }
   }
 
   // 切换 highlight.js 代码主题
@@ -136,11 +289,20 @@ export const useStore = defineStore(`store`, () => {
   }
 
   // 自义定 CSS 编辑器
-  const cssEditor = ref<CodeMirror.EditorFromTextArea | null>(null)
+  const cssEditor = ref<EditorView | null>(null)
+  const cssEditorThemeCompartment = ref<Compartment | null>(null)
+
   const setCssEditorValue = (content: string) => {
-    (cssEditor.value!).setValue(content)
+    if (cssEditor.value) {
+      cssEditor.value.dispatch({
+        changes: { from: 0, to: cssEditor.value.state.doc.length, insert: content },
+      })
+    }
   }
-  // 自定义 CSS 内容
+  /**
+   * 自定义 CSS 内容
+   * @deprecated 在后续版本中将会移除
+   */
   const cssContent = useStorage(`__css_content`, DEFAULT_CSS_CONTENT)
   const cssContentConfig = useStorage(addPrefix(`css_content_config`), {
     active: `方案1`,
@@ -157,9 +319,10 @@ export const useStore = defineStore(`store`, () => {
     // 清空过往历史记录
     cssContent.value = ``
   })
-  const getCurrentTab = () => cssContentConfig.value.tabs.find((tab) => {
-    return tab.name === cssContentConfig.value.active
-  })!
+  const getCurrentTab = () =>
+    cssContentConfig.value.tabs.find((tab) => {
+      return tab.name === cssContentConfig.value.active
+    })!
   const tabChanged = (name: string) => {
     cssContentConfig.value.active = name
     const content = cssContentConfig.value.tabs.find((tab) => {
@@ -190,129 +353,148 @@ export const useStore = defineStore(`store`, () => {
   }
 
   const renderer = initRenderer({
-    theme: customCssWithTemplate(css2json(getCurrentTab().content), primaryColor.value, customizeTheme(themeMap[theme.value], { fontSize: fontSizeNumber.value, color: primaryColor.value })),
+    theme: customCssWithTemplate(
+      css2json(getCurrentTab().content),
+      primaryColor.value,
+      customizeTheme(themeMap[theme.value], {
+        fontSize: fontSizeNumber.value,
+        color: primaryColor.value,
+      }),
+    ),
     fonts: fontFamily.value,
     size: fontSize.value,
     isUseIndent: isUseIndent.value,
+    isUseJustify: isUseJustify.value,
+    isMacCodeBlock: isMacCodeBlock.value,
+    isShowLineNumber: isShowLineNumber.value,
   })
 
-  const readingTime = ref<ReadTimeResults | null>(null)
+  const readingTime = reactive({
+    chars: 0,
+    words: 0,
+    minutes: 0,
+  })
+
+  // 文章标题,用于生成目录
+  const titleList = ref<{
+    url: string
+    title: string
+    level: number
+  }[]>([])
 
   // 更新编辑器
   const editorRefresh = () => {
     codeThemeChange()
-    renderer.reset({ citeStatus: isCiteStatus.value, legend: legend.value, isUseIndent: isUseIndent.value, countStatus: isCountStatus.value })
+    renderer.reset({
+      citeStatus: isCiteStatus.value,
+      legend: legend.value,
+      isUseIndent: isUseIndent.value,
+      isUseJustify: isUseJustify.value,
+      countStatus: isCountStatus.value,
+      isMacCodeBlock: isMacCodeBlock.value,
+      isShowLineNumber: isShowLineNumber.value,
+    })
 
-    const { markdownContent, readingTime: readingTimeResult } = renderer.parseFrontMatterAndContent(editor.value!.getValue())
-    readingTime.value = readingTimeResult
-    let outputTemp = marked.parse(markdownContent) as string
-    outputTemp = DOMPurify.sanitize(outputTemp)
+    const raw = editor.value ? editor.value.state.doc.toString() : ``
+    const { html: baseHtml, readingTime: readingTimeResult } = renderMarkdown(raw, renderer)
+    readingTime.chars = raw.length
+    readingTime.words = readingTimeResult.words
+    readingTime.minutes = Math.ceil(readingTimeResult.minutes)
+    output.value = postProcessHtml(baseHtml, readingTimeResult, renderer)
 
-    // 阅读时间及字数统计
-    outputTemp = renderer.buildReadingTime(readingTimeResult) + outputTemp
+    // 提取标题
+    const div = document.createElement(`div`)
+    div.innerHTML = output.value
+    const list = div.querySelectorAll<HTMLElement>(`[data-heading]`)
 
-    // 去除第一行的 margin-top
-    outputTemp = outputTemp.replace(/(style=".*?)"/, `$1;margin-top: 0"`)
-    // 引用脚注
-    outputTemp += renderer.buildFootnotes()
-    // 附加的一些 style
-    outputTemp += renderer.buildAddition()
-
-    if (isMacCodeBlock.value) {
-      outputTemp += `
-        <style>
-          .hljs.code__pre > .mac-sign {
-            display: flex;
-          }
-        </style>
-      `
+    titleList.value = []
+    let i = 0
+    for (const item of list) {
+      item.setAttribute(`id`, `${i}`)
+      titleList.value.push({
+        url: `#${i}`,
+        title: `${item.textContent}`,
+        level: Number(item.tagName.slice(1)),
+      })
+      i++
     }
-
-    outputTemp += `
-      <style>
-        .code__pre {
-          padding: 0 !important;
-        }
-
-        .hljs.code__pre code {
-          display: -webkit-box;
-          padding: 0.5em 1em 1em;
-          overflow-x: auto;
-          text-indent: 0;
-        }
-      </style>
-    `
-
-    output.value = renderer.createContainer(outputTemp)
+    output.value = div.innerHTML
   }
 
   // 更新 CSS
   const updateCss = () => {
-    const json = css2json(cssEditor.value!.getValue())
-    const newTheme = customCssWithTemplate(json, primaryColor.value, customizeTheme(themeMap[theme.value], { fontSize: fontSizeNumber.value, color: primaryColor.value }))
-    renderer.setOptions({
-      theme: newTheme,
-    })
+    if (cssEditor.value) {
+      const json = css2json(cssEditor.value.state.doc.toString())
+      const newTheme = customCssWithTemplate(
+        json,
+        primaryColor.value,
+        customizeTheme(themeMap[theme.value], {
+          fontSize: fontSizeNumber.value,
+          color: primaryColor.value,
+        }),
+      )
+      renderer.setOptions({
+        theme: newTheme,
+      })
 
-    editorRefresh()
+      editorRefresh()
+    }
   }
   // 初始化 CSS 编辑器
   onMounted(() => {
-    const cssEditorDom = document.querySelector<HTMLTextAreaElement>(`#cssEditor`)!
+    const cssEditorDom = document.querySelector<HTMLTextAreaElement>(
+      `#cssEditor`,
+    )!
     cssEditorDom.value = getCurrentTab().content
-    const theme = isDark.value ? `darcula` : `xq-light`
-    cssEditor.value = markRaw(
-      CodeMirror.fromTextArea(cssEditorDom, {
-        mode: `css`,
-        theme,
-        lineNumbers: false,
-        lineWrapping: true,
-        styleActiveLine: true,
-        matchBrackets: true,
-        autofocus: true,
-        extraKeys: {
-          [`${shiftKey}-${altKey}-F`]: function autoFormat(editor: CodeMirror.Editor) {
-            formatDoc(editor.getValue(), `css`).then((doc) => {
-              getCurrentTab().content = doc
-              editor.setValue(doc)
-            })
-          },
-        },
-      } as never),
-    )
+    // 创建 CSS 编辑器的容器
+    const cssContainer = document.createElement(`div`)
+    cssEditorDom.parentNode?.replaceChild(cssContainer, cssEditorDom)
 
-    // 自动提示
-    cssEditor.value.on(`keyup`, (cm, e) => {
-      if ((e.keyCode >= 65 && e.keyCode <= 90) || e.keyCode === 189) {
-        (cm as any).showHint(e)
-      }
+    // 创建主题 Compartment 用于动态切换
+    cssEditorThemeCompartment.value = new Compartment()
+
+    // 创建 CSS 编辑器
+    const state = EditorState.create({
+      doc: getCurrentTab().content,
+      extensions: [
+        cssSetup(),
+        cssEditorThemeCompartment.value.of(editorTheme(isDark.value)),
+        CMEditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            updateCss()
+            getCurrentTab().content = update.state.doc.toString()
+          }
+        }),
+      ],
     })
 
-    // 实时保存
-    cssEditor.value.on(`update`, () => {
-      updateCss()
-      getCurrentTab().content = cssEditor.value!.getValue()
-    })
+    cssEditor.value = markRaw(new CMEditorView({
+      state,
+      parent: cssContainer,
+    }))
   })
 
   watch(isDark, () => {
-    const theme = isDark.value ? `darcula` : `xq-light`
-    toRaw(cssEditor.value)?.setOption?.(`theme`, theme)
+    if (cssEditor.value && cssEditorThemeCompartment.value) {
+      cssEditor.value.dispatch({
+        effects: cssEditorThemeCompartment.value.reconfigure(editorTheme(isDark.value)),
+      })
+    }
   })
 
   // 重置样式
   const resetStyle = () => {
-    isCiteStatus.value = false
-    isMacCodeBlock.value = true
-    isCountStatus.value = false
+    isCiteStatus.value = defaultStyleConfig.isCiteStatus
+    isMacCodeBlock.value = defaultStyleConfig.isMacCodeBlock
+    isShowLineNumber.value = defaultStyleConfig.isShowLineNumber
+    isCountStatus.value = defaultStyleConfig.isCountStatus
 
-    theme.value = themeOptions[0].value
-    fontFamily.value = fontFamilyOptions[0].value
-    fontFamily.value = fontFamilyOptions[0].value
-    fontSize.value = fontSizeOptions[2].value
-    primaryColor.value = colorOptions[0].value
-    codeBlockTheme.value = codeBlockThemeOptions[23].value
-    legend.value = legendOptions[3].value
+    theme.value = defaultStyleConfig.theme
+    fontFamily.value = defaultStyleConfig.fontFamily
+    fontSize.value = defaultStyleConfig.fontSize
+    primaryColor.value = defaultStyleConfig.primaryColor
+    codeBlockTheme.value = defaultStyleConfig.codeBlockTheme
+    legend.value = defaultStyleConfig.legend
 
     cssContentConfig.value = {
       active: `方案 1`,
@@ -326,16 +508,22 @@ export const useStore = defineStore(`store`, () => {
       ],
     }
 
-    cssEditor.value!.setValue(DEFAULT_CSS_CONTENT)
+    if (cssEditor.value) {
+      cssEditor.value.dispatch({
+        changes: { from: 0, to: cssEditor.value.state.doc.length, insert: DEFAULT_CSS_CONTENT },
+      })
+    }
 
     updateCss()
     editorRefresh()
 
-    toast.success(`样式重置成功~`)
+    toast.success(`样式已重置`)
   }
 
   // 为函数添加刷新编辑器的功能
-  const withAfterRefresh = (fn: (...rest: any[]) => void) => (...rest: any[]) => {
+  const withAfterRefresh = (fn: (...rest: any[]) => void) => (
+    ...rest: any[]
+  ) => {
     fn(...rest)
     editorRefresh()
   }
@@ -343,12 +531,20 @@ export const useStore = defineStore(`store`, () => {
   const getTheme = (size: string, color: string) => {
     const newTheme = themeMap[theme.value]
     const fontSize = Number(size.replace(`px`, ``))
-    return customCssWithTemplate(css2json(getCurrentTab().content), color, customizeTheme(newTheme, { fontSize, color }))
+    return customCssWithTemplate(
+      css2json(getCurrentTab().content),
+      color,
+      customizeTheme(newTheme, { fontSize, color }),
+    )
   }
 
   const themeChanged = withAfterRefresh((newTheme: keyof typeof themeMap) => {
     renderer.setOptions({
-      theme: customCssWithTemplate(css2json(getCurrentTab().content), primaryColor.value, customizeTheme(themeMap[newTheme], { fontSize: fontSizeNumber.value })),
+      theme: customCssWithTemplate(
+        css2json(getCurrentTab().content),
+        primaryColor.value,
+        customizeTheme(themeMap[newTheme], { fontSize: fontSizeNumber.value }),
+      ),
     })
     theme.value = newTheme
   })
@@ -384,12 +580,20 @@ export const useStore = defineStore(`store`, () => {
     codeBlockTheme.value = newTheme
   })
 
+  const previewWidthChanged = withAfterRefresh((newWidth: string) => {
+    previewWidth.value = newWidth
+  })
+
   const legendChanged = withAfterRefresh((newVal) => {
     legend.value = newVal
   })
 
   const macCodeBlockChanged = withAfterRefresh(() => {
     toggleMacCodeBlock()
+  })
+
+  const showLineNumberChanged = withAfterRefresh(() => {
+    toggleShowLineNumber()
   })
 
   const citeStatusChanged = withAfterRefresh(() => {
@@ -404,53 +608,118 @@ export const useStore = defineStore(`store`, () => {
     toggleUseIndent()
   })
 
+  const useJustifyChanged = withAfterRefresh(() => {
+    toggleUseJustify()
+  })
+
+  const aiToolboxChanged = withAfterRefresh(() => {
+    toggleAIToolbox()
+  })
+
+  const editorContent2HTML = () => {
+    const temp = processHtmlContent(primaryColor.value)
+    document.querySelector(`#output`)!.innerHTML = output.value
+    return temp
+  }
+
   // 导出编辑器内容为 HTML，并且下载到本地
   const exportEditorContent2HTML = () => {
-    exportHTML(primaryColor.value)
+    exportHTML(primaryColor.value, posts.value[currentPostIndex.value].title)
+    document.querySelector(`#output`)!.innerHTML = output.value
+  }
+
+  // 导出编辑器内容为无样式 HTML
+  const exportEditorContent2PureHTML = () => {
+    if (editor.value) {
+      exportPureHTML(editor.value.state.doc.toString(), posts.value[currentPostIndex.value].title)
+    }
+  }
+
+  // 下载卡片
+  const downloadAsCardImage = async () => {
+    const el = document.querySelector<HTMLElement>(`#output-wrapper>.preview`)!
+    const url = await toPng(el, {
+      backgroundColor: isDark.value ? `` : `#fff`,
+      skipFonts: true,
+      pixelRatio: Math.max(window.devicePixelRatio || 1, 2),
+      style: {
+        margin: `0`,
+      },
+    })
+
+    downloadFile(url, `${sanitizeTitle(posts.value[currentPostIndex.value].title)}.png`, `image/png`)
+  }
+
+  // 导出编辑器内容为 PDF
+  const exportEditorContent2PDF = () => {
+    exportPDF(primaryColor.value, posts.value[currentPostIndex.value].title)
     document.querySelector(`#output`)!.innerHTML = output.value
   }
 
   // 导出编辑器内容到本地
   const exportEditorContent2MD = () => {
-    downloadMD(editor.value!.getValue())
+    if (editor.value) {
+      downloadMD(editor.value.state.doc.toString(), posts.value[currentPostIndex.value].title)
+    }
   }
 
   // 导入默认文档
-  const importDefaultContent = async () => {
-    editor.value!.setValue(DEFAULT_CONTENT)
-    toast.success(`文档已重置为默认文档`)
+  const importDefaultContent = () => {
+    if (editor.value) {
+      editor.value.dispatch({
+        changes: { from: 0, to: editor.value.state.doc.length, insert: DEFAULT_CONTENT },
+      })
+      toast.success(`文档已重置`)
+    }
   }
 
-  // 导入 Markdown 文档
-  const importMarkdownContent = () => {
-    window.$api.importPost().then((c) => {
-      (editor.value!).setValue(c as string)
-      toast.success(`文档导入成功`)
-    })
-    // const body = document.body
-    // const input = document.createElement(`input`)
-    // input.type = `file`
-    // input.name = `filename`
-    // input.accept = `.md`
-    // input.onchange = () => {
-    //   const file = input.files![0]
-    //   if (!file) {
-    //     return
-    //   }
-
-    //   const reader = new FileReader()
-    //   reader.readAsText(file)
-    //   reader.onload = (event) => {
-    //     (editor.value!).setValue((event.target!).result as string)
-    //     toast.success(`文档导入成功`)
-    //   }
-    // }
-
-    // body.appendChild(input)
-    // input.click() // in electron File chooser dialog can only be shown with a user activation.
-    // body.removeChild(input)
+  // 清空内容
+  const clearContent = () => {
+    if (editor.value) {
+      editor.value.dispatch({
+        changes: { from: 0, to: editor.value.state.doc.length, insert: `` },
+      })
+      toast.success(`内容已清空`)
+    }
   }
 
+  const copyToClipboard = async () => {
+    if (editor.value) {
+      const selection = editor.value.state.selection.main
+      const selectedText = editor.value.state.doc.sliceString(selection.from, selection.to)
+      copyPlain(selectedText)
+    }
+  }
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (editor.value) {
+        editor.value.dispatch(editor.value.state.replaceSelection(text))
+      }
+    }
+    catch (error) {
+      console.log(`粘贴失败`, error)
+    }
+  }
+
+  // 撤销操作
+  const undo = () => {
+    if (editor.value) {
+      // undo 和 redo 由键盘快捷键处理，这里不需要手动实现
+      console.log(`Undo should be handled by keyboard shortcuts`)
+    }
+  }
+
+  // 重做操作
+  const redo = () => {
+    if (editor.value) {
+      // undo 和 redo 由键盘快捷键处理，这里不需要手动实现
+      console.log(`Redo should be handled by keyboard shortcuts`)
+    }
+  }
+
+  // 是否打开重置样式对话框
   const isOpenConfirmDialog = ref(false)
 
   // 重置样式
@@ -466,10 +735,15 @@ export const useStore = defineStore(`store`, () => {
     toggleEditOnLeft,
 
     isMacCodeBlock,
+    isShowLineNumber,
     isCiteStatus,
     citeStatusChanged,
+    showAIToolbox,
+    aiToolboxChanged,
     isUseIndent,
     useIndentChanged,
+    isUseJustify,
+    useJustifyChanged,
 
     isCountStatus,
     countStatusChanged,
@@ -484,6 +758,8 @@ export const useStore = defineStore(`store`, () => {
     codeBlockTheme,
     legend,
     readingTime,
+    previewWidth,
+    previewWidthChanged,
 
     editorRefresh,
 
@@ -494,13 +770,23 @@ export const useStore = defineStore(`store`, () => {
     codeBlockThemeChanged,
     legendChanged,
     macCodeBlockChanged,
+    showLineNumberChanged,
 
     formatContent,
     exportEditorContent2HTML,
+    exportEditorContent2PureHTML,
     exportEditorContent2MD,
+    exportEditorContent2PDF,
+    downloadAsCardImage,
 
-    importMarkdownContent,
     importDefaultContent,
+    clearContent,
+
+    copyToClipboard,
+    pasteFromClipboard,
+
+    undo,
+    redo,
 
     isOpenConfirmDialog,
     resetStyleConfirm,
@@ -513,34 +799,106 @@ export const useStore = defineStore(`store`, () => {
     tabChanged,
     renameTab,
     posts,
+    currentPostId,
     currentPostIndex,
+    getPostById,
     addPost,
     renamePost,
     delPost,
     isOpenPostSlider,
     isOpenRightSlider,
+
+    titleList,
+    isMobile,
+    updatePostParentId,
+    collapseAllPosts,
+    expandAllPosts,
+
+    editorContent2HTML,
   }
 })
 
 export const useDisplayStore = defineStore(`display`, () => {
   // 是否展示 CSS 编辑器
-  const isShowCssEditor = ref(false)
+  const isShowCssEditor = useStorage(`isShowCssEditor`, false)
   const toggleShowCssEditor = useToggle(isShowCssEditor)
 
   // 是否展示插入表格对话框
   const isShowInsertFormDialog = ref(false)
   const toggleShowInsertFormDialog = useToggle(isShowInsertFormDialog)
 
+  // 是否展示插入公众号名片对话框
+  const isShowInsertMpCardDialog = ref(false)
+  const toggleShowInsertMpCardDialog = useToggle(isShowInsertMpCardDialog)
+
   // 是否展示上传图片对话框
   const isShowUploadImgDialog = ref(false)
   const toggleShowUploadImgDialog = useToggle(isShowUploadImgDialog)
+
+  const aiDialogVisible = ref(false)
+  const aiImageDialogVisible = ref(false)
+
+  function toggleAIDialog(value?: boolean) {
+    aiDialogVisible.value = value ?? !aiDialogVisible.value
+  }
+
+  function toggleAIImageDialog(value?: boolean) {
+    aiImageDialogVisible.value = value ?? !aiImageDialogVisible.value
+  }
 
   return {
     isShowCssEditor,
     toggleShowCssEditor,
     isShowInsertFormDialog,
     toggleShowInsertFormDialog,
+    isShowInsertMpCardDialog,
+    toggleShowInsertMpCardDialog,
     isShowUploadImgDialog,
     toggleShowUploadImgDialog,
+    aiDialogVisible,
+    toggleAIDialog,
+    aiImageDialogVisible,
+    toggleAIImageDialog,
   }
 })
+
+// 获取所有状态的方法
+export function getAllStoreStates() {
+  const store = useStore()
+  const displayStore = useDisplayStore()
+
+  return {
+    // 主 store 的状态
+    isDark: store.isDark,
+    isEditOnLeft: store.isEditOnLeft,
+    isMacCodeBlock: store.isMacCodeBlock,
+    isShowLineNumber: store.isShowLineNumber,
+    isCiteStatus: store.isCiteStatus,
+    showAIToolbox: store.showAIToolbox,
+    isCountStatus: store.isCountStatus,
+    isUseIndent: store.isUseIndent,
+    isUseJustify: store.isUseJustify,
+    isOpenRightSlider: store.isOpenRightSlider,
+    isOpenPostSlider: store.isOpenPostSlider,
+    theme: store.theme,
+    fontFamily: store.fontFamily,
+    fontSize: store.fontSize,
+    primaryColor: store.primaryColor,
+    codeBlockTheme: store.codeBlockTheme,
+    legend: store.legend,
+    currentPostId: store.currentPostId,
+    currentPostIndex: store.currentPostIndex,
+    posts: store.posts,
+    cssContentConfig: store.cssContentConfig,
+    titleList: store.titleList,
+    readingTime: store.readingTime,
+
+    // displayStore 的状态
+    isShowCssEditor: displayStore.isShowCssEditor,
+    isShowInsertFormDialog: displayStore.isShowInsertFormDialog,
+    isShowUploadImgDialog: displayStore.isShowUploadImgDialog,
+    isShowInsertMpCardDialog: displayStore.isShowInsertMpCardDialog,
+    aiDialogVisible: displayStore.aiDialogVisible,
+    aiImageDialogVisible: displayStore.aiImageDialogVisible,
+  }
+}

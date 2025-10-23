@@ -1,35 +1,23 @@
+import { initializeMermaid } from '@md/core/utils'
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import App from './App.vue'
 
-import 'virtual:uno.css'
-import 'codemirror/lib/codemirror.css'
-import 'codemirror/theme/xq-light.css'
-import 'codemirror/theme/darcula.css'
+import { setupComponents } from './utils/setup-components'
+
+import 'vue-sonner/style.css'
 
 /* 每个页面公共css */
-import '@renderer/assets/index.css'
-import '@renderer/assets/less/theme.less'
+import '@/assets/index.css'
+import '@/assets/less/theme.less'
 
-import 'codemirror/mode/css/css'
-import 'codemirror/mode/javascript/javascript'
-import 'codemirror/mode/markdown/markdown'
-import 'codemirror/addon/edit/closebrackets'
-import 'codemirror/addon/edit/matchbrackets'
-import 'codemirror/addon/selection/active-line'
-import 'codemirror/addon/hint/show-hint'
-import 'codemirror/addon/hint/css-hint'
+// 异步初始化 mermaid，避免初始化顺序问题
+initializeMermaid().catch(console.error)
+
+setupComponents()
 
 const app = createApp(App)
 
 app.use(createPinia())
 
 app.mount(`#app`)
-
-
-declare global {
-  interface Window {
-    $api: any;
-    $globalData: any;
-  }
-}

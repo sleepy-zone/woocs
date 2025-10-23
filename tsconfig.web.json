@@ -12,6 +12,18 @@
     "paths": {
       "@renderer/*": [
         "src/renderer/src/*"
+      ],
+      "@md/core": [
+        "src/renderer/packages/core/src/index.ts"
+      ],
+      "@md/core/*": [
+        "src/renderer/packages/core/src/*"
+      ],
+      "@md/shared": [
+        "src/renderer/packages/shared/src/index.ts"
+      ],
+      "@md/shared/*": [
+        "src/renderer/packages/shared/src/*"
       ]
     }
   }

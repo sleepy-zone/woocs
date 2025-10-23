@@ -10,10 +10,8 @@ module.exports = {
   },
 
   content: [
-    `./pages/**/*.{ts,tsx,vue}`,
-    `./components/**/*.{ts,tsx,vue}`,
-    `./app/**/*.{ts,tsx,vue}`,
-    `./src/**/*.{ts,tsx,vue}`,
+    `./src/renderer/src/**/*.{ts,tsx,vue}`,
+    `./src/renderer/packages/shared/src/**/*.{ts,tsx,vue}`,
   ],
 
   theme: {

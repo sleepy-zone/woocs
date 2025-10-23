@@ -20,7 +20,6 @@ const visible = ref(false)
 const target = ref<Target>(null)
 
 function scrollToTop(e: MouseEvent) {
-  console.log(`scrollToTop`)
   target.value?.scrollTo({ top: 0, left: 0, behavior: `smooth` })
   props.onClick?.(e)
 }
@@ -55,7 +54,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Button v-if="visible" variant="outline" size="icon" class="fixed z-50 rounded-full" :style="{ left: `${left}px`, top: `${top}px`, right: `${right}px`, bottom: `${bottom}px` }" @click="scrollToTop">
+  <Button v-if="visible" variant="outline" size="icon" class="absolute z-50 rounded-full" :style="{ left: `${left}px`, top: `${top}px`, right: `${right}px`, bottom: `${bottom}px` }" @click="scrollToTop">
     <ArrowUpFromLine />
   </Button>
 </template>

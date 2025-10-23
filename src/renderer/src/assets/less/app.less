@@ -1,14 +1,13 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+//* {
+//  box-sizing: border-box;
+//  margin: 0;
+//  padding: 0;
+//}
 
 html,
 body {
   height: 100%;
-  font-family: 'PingFang SC', BlinkMacSystemFont, Roboto, 'Helvetica Neue',
-    sans-serif;
+  font-family: 'PingFang SC', BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
 }
 
 input,
@@ -48,7 +47,6 @@ section {
   display: block;
   height: 100%;
   width: 100%;
-  padding: 10px;
   border: none;
 }
 
@@ -66,6 +64,7 @@ section {
   justify-content: center;
   padding: 0;
   overflow-y: scroll;
+  width: 100%;
 }
 
 .hint {
@@ -75,13 +74,15 @@ section {
 
 .preview {
   position: relative;
-  margin: 0 -20px;
-  width: 375px;
+  // margin: 0 -20px;
+  // width: 375px;
   min-height: 100%;
+  margin: 0 auto;
   padding: 20px;
   font-size: 14px;
   box-sizing: border-box;
   outline: none;
+  transition: all 300ms ease-in-out;
   word-wrap: break-word;
 }
 

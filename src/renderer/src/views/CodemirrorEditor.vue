@@ -1,68 +1,127 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { altKey, altSign, ctrlKey, shiftKey, shiftSign } from '@renderer/config'
-import { useDisplayStore, useStore } from '@renderer/stores'
+
+import { Compartment, EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { highlightPendingBlocks, hljs } from '@md/core'
+import { markdownSetup, theme } from '@md/shared/editor'
+import imageCompression from 'browser-image-compression'
+import { Eye, Pen } from 'lucide-vue-next'
+import { SidebarAIToolbar } from '@/components/ai'
 import {
-  checkImage,
-  formatDoc,
-  toBase64,
-} from '@renderer/utils'
-import fileApi from '@renderer/utils/file'
-import CodeMirror from 'codemirror'
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
+import { SearchTab } from '@/components/ui/search-tab'
+import { checkImage, toBase64 } from '@/utils'
+import { fileUpload } from '@/utils/file'
 
 const store = useStore()
 const displayStore = useDisplayStore()
-const { isDark, output, editor, readingTime } = storeToRefs(store)
 
-const {
-  editorRefresh,
-  exportEditorContent2HTML,
-  exportEditorContent2MD,
-  formatContent,
-  importMarkdownContent,
-  importDefaultContent,
-  resetStyleConfirm,
-} = store
+const { isDark, output, editor } = storeToRefs(store)
+const { editorRefresh } = store
 
-const {
-  toggleShowInsertFormDialog,
-  toggleShowUploadImgDialog,
-} = displayStore
+const { toggleShowUploadImgDialog } = displayStore
 
-const isImgLoading = ref(false)
+watch(output, () => {
+  nextTick(() => {
+    const outputElement = document.getElementById(`output`)
+    if (outputElement) {
+      highlightPendingBlocks(hljs, outputElement)
+    }
+  })
+})
+
+const backLight = ref(false)
+const isCoping = ref(false)
+
+// 辅助函数：查找 CodeMirror 滚动容器
+function findCodeMirrorScroller(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.cm-scroller`)
+    || document.querySelector<HTMLElement>(`.CodeMirror-scroll`)
+}
+
+function startCopy() {
+  backLight.value = true
+  isCoping.value = true
+}
+
+// 拷贝结束
+function endCopy() {
+  backLight.value = false
+  setTimeout(() => {
+    isCoping.value = false
+  }, 800)
+}
+
+const showEditor = ref(true)
+
+// 切换编辑/预览视图（仅限移动端）
+function toggleView() {
+  showEditor.value = !showEditor.value
+}
+
+// AI 工具箱已移到侧边栏
+
+const previewRef = useTemplateRef<HTMLDivElement>(`previewRef`)
+
 const timeout = ref<NodeJS.Timeout>()
-
-const preview = ref<HTMLDivElement | null>(null)
+const codeMirrorView = ref<EditorView | null>(null)
+const themeCompartment = new Compartment()
 
 // 使浏览区与编辑区滚动条建立同步联系
 function leftAndRightScroll() {
   const scrollCB = (text: string) => {
-    let source: HTMLElement
-    let target: HTMLElement
+    // AIPolishBtnRef.value?.close()
+
+    let source: HTMLElement | null
+    let target: HTMLElement | null
 
     clearTimeout(timeout.value)
     if (text === `preview`) {
-      source = preview.value!
-      target = document.querySelector<HTMLElement>(`.CodeMirror-scroll`)!
-
-      editor.value!.off(`scroll`, editorScrollCB)
-      timeout.value = setTimeout(() => {
-        editor.value!.on(`scroll`, editorScrollCB)
-      }, 300)
+      source = previewRef.value!
+      target = findCodeMirrorScroller()
+      if (!target) {
+        console.warn(`Cannot find CodeMirror scroll container`)
+        return
+      }
+      // CodeMirror v6 使用 DOM 事件
+      const scrollEl = findCodeMirrorScroller()
+      if (scrollEl) {
+        scrollEl.removeEventListener(`scroll`, editorScrollCB)
+        timeout.value = setTimeout(() => {
+          scrollEl.addEventListener(`scroll`, editorScrollCB)
+        }, 300)
+      }
     }
     else {
-      source = document.querySelector<HTMLElement>(`.CodeMirror-scroll`)!
-      target = preview.value!
-
+      source = findCodeMirrorScroller()
+      target = previewRef.value!
+      if (!source) {
+        console.warn(`Cannot find CodeMirror scroll container`)
+        return
+      }
       target.removeEventListener(`scroll`, previewScrollCB, false)
       timeout.value = setTimeout(() => {
-        target.addEventListener(`scroll`, previewScrollCB, false)
+        target!.addEventListener(`scroll`, previewScrollCB, false)
       }, 300)
     }
 
-    const percentage
-      = source.scrollTop / (source.scrollHeight - source.offsetHeight)
-    const height = percentage * (target.scrollHeight - target.offsetHeight)
+    if (!source || !target) {
+      return
+    }
+
+    const sourceHeight = source.scrollHeight - source.offsetHeight
+    const targetHeight = target.scrollHeight - target.offsetHeight
+
+    if (sourceHeight <= 0 || targetHeight <= 0) {
+      return
+    }
+
+    const percentage = source.scrollTop / sourceHeight
+    const height = percentage * targetHeight
 
     target.scrollTo(0, height)
   }
@@ -75,8 +134,13 @@ function leftAndRightScroll() {
     scrollCB(`preview`)
   }
 
-  (preview.value!).addEventListener(`scroll`, previewScrollCB, false)
-  editor.value!.on(`scroll`, editorScrollCB)
+  if (previewRef.value) {
+    previewRef.value.addEventListener(`scroll`, previewScrollCB, false)
+  }
+  const scrollEl = findCodeMirrorScroller()
+  if (scrollEl) {
+    scrollEl.addEventListener(`scroll`, editorScrollCB)
+  }
 }
 
 onMounted(() => {
@@ -85,32 +149,66 @@ onMounted(() => {
   }, 300)
 })
 
-// 更新编辑器
-function onEditorRefresh() {
-  editorRefresh()
+const searchTabRef
+  = useTemplateRef<InstanceType<typeof SearchTab>>(`searchTabRef`)
+
+// 用于存储待处理的搜索请求
+const pendingSearchRequest = ref<{ selected: string } | null>(null)
+
+function openSearchWithSelection(view: EditorView) {
+  const selection = view.state.selection.main
+  const selected = view.state.doc.sliceString(selection.from, selection.to).trim()
+
+  if (searchTabRef.value) {
+    // SearchTab 已准备好，直接使用
+    if (selected) {
+      searchTabRef.value.setSearchWord(selected)
+    }
+    else {
+      searchTabRef.value.showSearchTab = true
+    }
+  }
+  else {
+    // SearchTab 还没准备好，保存请求
+    pendingSearchRequest.value = { selected }
+  }
 }
 
-const backLight = ref(false)
-const isCoping = ref(false)
+// 监听 searchTabRef 的变化，处理待处理的请求
+watch(searchTabRef, (newRef) => {
+  if (newRef && pendingSearchRequest.value) {
+    const { selected } = pendingSearchRequest.value
+    if (selected) {
+      newRef.setSearchWord(selected)
+    }
+    else {
+      newRef.showSearchTab = true
+    }
+    pendingSearchRequest.value = null
+  }
+})
 
-function startCopy() {
-  isCoping.value = true
-  backLight.value = true
+function handleGlobalKeydown(e: KeyboardEvent) {
+  // 处理 ESC 键关闭搜索
+  const editorView = codeMirrorView.value
+
+  if (e.key === `Escape` && searchTabRef.value?.showSearchTab) {
+    searchTabRef.value.showSearchTab = false
+    e.preventDefault()
+    editorView?.focus()
+  }
 }
 
-// 拷贝结束
-function endCopy() {
-  backLight.value = false
-  setTimeout(() => {
-    isCoping.value = false
-  }, 800)
-}
+onMounted(() => {
+  // 使用较低优先级确保 CodeMirror 键盘事件先处理
+  document.addEventListener(`keydown`, handleGlobalKeydown, { passive: false, capture: false })
+})
 
 function beforeUpload(file: File) {
   // validate image
   const checkResult = checkImage(file)
   if (!checkResult.ok) {
-    toast.error(checkResult.msg!)
+    toast.error(checkResult.msg)
     return false
   }
 
@@ -124,6 +222,7 @@ function beforeUpload(file: File) {
     toast.error(`请先配置 ${imgHost} 图床参数`)
     return false
   }
+
   return true
 }
 
@@ -133,325 +232,424 @@ function uploaded(imageUrl: string) {
     toast.error(`上传图片未知异常`)
     return
   }
-  toggleShowUploadImgDialog(false)
-  // 上传成功，获取光标
-  const cursor = editor.value!.getCursor()
+  setTimeout(() => {
+    toggleShowUploadImgDialog(false)
+  }, 1000)
+  // 上传成功，插入图片
   const markdownImage = `![](${imageUrl})`
   // 将 Markdown 形式的 URL 插入编辑框光标所在位置
-  toRaw(store.editor!).replaceSelection(`\n${markdownImage}\n`, cursor as any)
+  if (codeMirrorView.value) {
+    codeMirrorView.value.dispatch(codeMirrorView.value.state.replaceSelection(`\n${markdownImage}\n`))
+  }
   toast.success(`图片上传成功`)
 }
-function uploadImage(file: File, cb?: { (url: any): void, (arg0: unknown): void } | undefined) {
-  isImgLoading.value = true
 
-  toBase64(file)
-    .then(base64Content => fileApi.fileUpload(base64Content, file))
-    .then((url) => {
-      if (cb) {
-        cb(url)
-      }
-      else {
-        uploaded(url)
-      }
-    })
-    .catch((err) => {
-      toast.error(err.message)
-    })
-    .finally(() => {
-      isImgLoading.value = false
-    })
-}
-
-const changeTimer = ref<NodeJS.Timeout>()
-
-// 监听暗色模式并更新编辑器
-watch(isDark, () => {
-  const theme = isDark.value ? `darcula` : `xq-light`
-  toRaw(editor.value)?.setOption?.(`theme`, theme)
-})
-
-// 初始化编辑器
-async function initEditor() {
-  const editorDom = document.querySelector<HTMLTextAreaElement>(`#editor`)!
-
-  if (!editorDom.value) {
-    editorDom.value = await window.$api.getPost(store.posts[store.currentPostIndex].title)
+const isImgLoading = ref(false)
+async function compressImage(file: File) {
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1920,
+    useWebWorker: true,
   }
-  editor.value = CodeMirror.fromTextArea(editorDom, {
-    mode: `text/x-markdown`,
-    theme: isDark.value ? `darcula` : `xq-light`,
-    lineNumbers: false,
-    lineWrapping: true,
-    styleActiveLine: true,
-    autoCloseBrackets: true,
-    extraKeys: {
-      [`${shiftKey}-${altKey}-F`]: function autoFormat(editor) {
-        formatDoc(editor.getValue()).then((doc) => {
-          editor.setValue(doc)
-        })
-      },
-      [`${ctrlKey}-B`]: function bold(editor) {
-        const selected = editor.getSelection()
-        editor.replaceSelection(`**${selected}**`)
-      },
-      [`${ctrlKey}-I`]: function italic(editor) {
-        const selected = editor.getSelection()
-        editor.replaceSelection(`*${selected}*`)
-      },
-      [`${ctrlKey}-D`]: function del(editor) {
-        const selected = editor.getSelection()
-        editor.replaceSelection(`~~${selected}~~`)
-      },
-      [`${ctrlKey}-K`]: function italic(editor) {
-        const selected = editor.getSelection()
-        editor.replaceSelection(`[${selected}]()`)
-      },
-      [`${ctrlKey}-E`]: function code(editor) {
-        const selected = editor.getSelection()
-        editor.replaceSelection(`\`${selected}\``)
-      },
-      // 预备弃用
-      [`${ctrlKey}-L`]: function code(editor) {
-        const selected = editor.getSelection()
-        editor.replaceSelection(`\`${selected}\``)
-      },
-    },
-  })
-
-  editor.value.on(`change`, (e) => {
-    clearTimeout(changeTimer.value)
-    changeTimer.value = setTimeout(async () => {
-      onEditorRefresh()
-      const content = e.getValue()
-      // store.posts[store.currentPostIndex].content = content
-      // 更新本地文件
-      await window.$api.updatePost(store.posts[store.currentPostIndex].title, content);
-    }, 300)
-  })
-
-  // 粘贴上传图片并插入
-  editor.value.on(`paste`, (_cm, e) => {
-    if (!(e.clipboardData && e.clipboardData.items) || isImgLoading.value) {
-      return
+  const compressedFile = await imageCompression(file, options)
+  return compressedFile
+}
+async function uploadImage(
+  file: File,
+  cb?: { (url: any, data: string): void, (arg0: unknown): void } | undefined,
+  applyUrl?: boolean,
+) {
+  try {
+    isImgLoading.value = true
+    // compress image if useCompression is true
+    const useCompression = localStorage.getItem(`useCompression`) === `true`
+    if (useCompression) {
+      file = await compressImage(file)
     }
-    for (let i = 0, len = e.clipboardData.items.length; i < len; ++i) {
-      const item = e.clipboardData.items[i]
-      if (item.kind === `file`) {
-        // 校验图床参数
-        const pasteFile = item.getAsFile()!
-        const isValid = beforeUpload(pasteFile)
-        if (!isValid) {
-          continue
+    const base64Content = await toBase64(file)
+    const url = await fileUpload(base64Content, file)
+    if (cb) {
+      cb(url, base64Content)
+    }
+    else {
+      uploaded(url)
+    }
+    if (applyUrl) {
+      return uploaded(url)
+    }
+  }
+  catch (err) {
+    toast.error((err as any).message)
+  }
+  finally {
+    isImgLoading.value = false
+  }
+}
+
+// 从文件列表中查找一个 md 文件并解析
+async function getMd({ list }: { list: { path: string, file: File }[] }) {
+  return new Promise<{ str: string, file: File, path: string }>((resolve) => {
+    const { path, file } = list.find(item => item.path.match(/\.md$/))!
+    const reader = new FileReader()
+    reader.readAsText(file!, `UTF-8`)
+    reader.onload = (evt) => {
+      resolve({
+        str: evt.target!.result as string,
+        file,
+        path,
+      })
+    }
+  })
+}
+
+// 转换文件系统句柄中的文件为文件列表
+async function showFileStructure(root: any) {
+  const result = []
+  let cwd = ``
+  try {
+    const dirs = [root]
+    for (const dir of dirs) {
+      cwd += `${dir.name}/`
+      for await (const [, handle] of dir) {
+        if (handle.kind === `file`) {
+          result.push({
+            path: cwd + handle.name,
+            file: await handle.getFile(),
+          })
         }
-        uploadImage(pasteFile)
+        else {
+          result.push({
+            path: `${cwd + handle.name}/`,
+          })
+          dirs.push(handle)
+        }
       }
     }
+  }
+  catch (err) {
+    console.error(err)
+  }
+  return result
+}
+
+// 上传 md 中的图片
+async function uploadMdImg({
+  md,
+  list,
+}: {
+  md: { str: string, path: string, file: File }
+  list: { path: string, file: File }[]
+}) {
+  // 获取所有相对地址的图片
+  const mdImgList = [...(md.str.matchAll(/!\[(.*?)\]\((.*?)\)/g) || [])].filter(item => item)
+  const root = md.path.match(/.+?\//)![0]
+  const resList = await Promise.all<{ matchStr: string, url: string }>(
+    mdImgList.map((item) => {
+      return new Promise((resolve) => {
+        let [, , matchStr] = item
+        matchStr = matchStr.replace(/^.\//, ``) // 处理 ./img/ 为 img/ 统一相对路径风格
+        const { file }
+          = list.find(f => f.path === `${root}${matchStr}`) || {}
+        uploadImage(file!, url => resolve({ matchStr, url }))
+      })
+    }),
+  )
+  resList.forEach((item) => {
+    md.str = md.str
+      .replace(`](./${item.matchStr})`, `](${item.url})`)
+      .replace(`](${item.matchStr})`, `](${item.url})`)
   })
+  if (codeMirrorView.value) {
+    codeMirrorView.value.dispatch({
+      changes: { from: 0, to: codeMirrorView.value.state.doc.length, insert: md.str },
+    })
+  }
 }
 
-const container = ref(null)
-
-// 工具函数，添加格式
-function addFormat(cmd: string | number) {
-  (editor.value as any).options.extraKeys[cmd](editor.value)
-}
-
-const codeMirrorWrapper = ref<ComponentPublicInstance<HTMLDivElement> | null>(null)
+const codeMirrorWrapper = useTemplateRef<ComponentPublicInstance<HTMLDivElement>>(`codeMirrorWrapper`)
 
 // 转换 markdown 中的本地图片为线上图片
 // todo 处理事件覆盖
 function mdLocalToRemote() {
   const dom = codeMirrorWrapper.value!
 
-  // 上传 md 中的图片
-  const uploadMdImg = async ({ md, list }: { md: { str: string, path: string, file: File }, list: { path: string, file: File }[] }) => {
-    const mdImgList = [
-      ...(md.str.matchAll(/!\[(.*?)\]\((.*?)\)/g) || []),
-    ].filter((item) => {
-      return item // 获取所有相对地址的图片
-    })
-    const root = md.path.match(/.+?\//)![0]
-    const resList = await Promise.all<{ matchStr: string, url: string }>(
-      mdImgList.map((item) => {
-        return new Promise((resolve) => {
-          let [, , matchStr] = item
-          matchStr = matchStr.replace(/^.\//, ``) // 处理 ./img/ 为 img/ 统一相对路径风格
-          const { file }
-            = list.find(f => f.path === `${root}${matchStr}`) || {}
-          uploadImage(file!, (url) => {
-            resolve({ matchStr, url })
-          })
-        })
-      }),
-    )
-    resList.forEach((item) => {
-      md.str = md.str
-        .replace(`](./${item.matchStr})`, `](${item.url})`)
-        .replace(`](${item.matchStr})`, `](${item.url})`)
-    })
-    editor.value!.setValue(md.str)
-  }
-
   dom.ondragover = evt => evt.preventDefault()
-  dom.ondrop = async (evt: any) => {
+  dom.ondrop = async (evt) => {
     evt.preventDefault()
-    for (const item of evt.dataTransfer.items) {
-      item.getAsFileSystemHandle().then(async (handle: { kind: string, getFile: () => any }) => {
-        if (handle.kind === `directory`) {
-          const list = await showFileStructure(handle) as { path: string, file: File }[]
-          const md = await getMd({ list })
-          uploadMdImg({ md, list })
-        }
-        else {
-          const file = await handle.getFile()
-          console.log(`file`, file)
-        }
-      })
+    if (evt.dataTransfer == null || !Array.isArray(evt.dataTransfer.items)) {
+      return
     }
-  }
 
-  // 从文件列表中查找一个 md 文件并解析
-  async function getMd({ list }: { list: { path: string, file: File }[] }) {
-    return new Promise<{ str: string, file: File, path: string }>((resolve) => {
-      const { path, file } = list.find(item => item.path.match(/\.md$/))!
-      const reader = new FileReader()
-      reader.readAsText(file!, `UTF-8`)
-      reader.onload = (evt) => {
-        resolve({
-          str: evt.target!.result as string,
-          file,
-          path,
-        })
-      }
-    })
-  }
-
-  // 转换文件系统句柄中的文件为文件列表
-  async function showFileStructure(root: any) {
-    const result = []
-    let cwd = ``
-    try {
-      const dirs = [root]
-      for (const dir of dirs) {
-        cwd += `${dir.name}/`
-        for await (const [, handle] of dir) {
-          if (handle.kind === `file`) {
-            result.push({
-              path: cwd + handle.name,
-              file: await handle.getFile(),
-            })
+    for (const item of evt.dataTransfer.items.filter(item => item.kind === `file`)) {
+      item
+        .getAsFileSystemHandle()
+        .then(async (handle: { kind: string, getFile: () => any }) => {
+          if (handle.kind === `directory`) {
+            const list = (await showFileStructure(handle)) as {
+              path: string
+              file: File
+            }[]
+            const md = await getMd({ list })
+            uploadMdImg({ md, list })
           }
           else {
-            result.push({
-              path: `${cwd + handle.name}/`,
-            })
-            dirs.push(handle)
+            const file = await handle.getFile()
+            console.log(`file`, file)
+            beforeUpload(file) && uploadImage(file)
           }
-        }
-      }
+        })
     }
-    catch (err) {
-      console.error(err)
-    }
-    return result
   }
 }
 
-onMounted(async () => {
-  await initEditor()
-  onEditorRefresh()
-  mdLocalToRemote()
+const changeTimer = ref<NodeJS.Timeout>()
+
+const editorRef = useTemplateRef<HTMLDivElement>(`editorRef`)
+const progressValue = ref(0)
+
+function createFormTextArea(dom: HTMLDivElement) {
+  // 创建编辑器状态
+  const state = EditorState.create({
+    doc: store.posts[store.currentPostIndex].content,
+    extensions: [
+      markdownSetup({
+        onSearch: openSearchWithSelection,
+      }),
+      themeCompartment.of(theme(isDark.value)),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          const value = update.state.doc.toString()
+          clearTimeout(changeTimer.value)
+          changeTimer.value = setTimeout(() => {
+            editorRefresh()
+
+            const currentPost = store.posts[store.currentPostIndex]
+            if (value === currentPost.content) {
+              return
+            }
+
+            currentPost.updateDatetime = new Date()
+            currentPost.content = value
+          }, 300)
+        }
+      }),
+    ],
+  })
+
+  // 创建编辑器视图
+  const view = new EditorView({
+    state,
+    parent: dom,
+  })
+
+  codeMirrorView.value = view
+
+  // 添加粘贴事件监听
+  view.dom.addEventListener(`paste`, async (event: ClipboardEvent) => {
+    if (!(event.clipboardData?.items) || isImgLoading.value) {
+      return
+    }
+    const items = [...event.clipboardData.items].map(item => item.getAsFile()).filter(item => item != null && beforeUpload(item)) as File[]
+    // 即使return了，粘贴的文本内容也会被插入
+    if (items.length === 0) {
+      return
+    }
+    // start progress
+    const intervalId = setInterval(() => {
+      const newProgress = progressValue.value + 1
+      if (newProgress >= 100) {
+        return
+      }
+      progressValue.value = newProgress
+    }, 100)
+    for (const item of items) {
+      event.preventDefault()
+      await uploadImage(item)
+    }
+    const cleanup = () => {
+      clearInterval(intervalId)
+      progressValue.value = 100 // 设置完成状态
+      // 可选：延迟一段时间后重置进度
+      setTimeout(() => {
+        progressValue.value = 0
+      }, 1000)
+    }
+    cleanup()
+  })
+
+  // 返回编辑器 view
+  return view
+}
+
+// 初始化编辑器
+onMounted(() => {
+  const editorDom = editorRef.value
+
+  if (editorDom == null) {
+    return
+  }
+
+  nextTick(() => {
+    const editorView = createFormTextArea(editorDom)
+    editor.value = editorView
+
+    // AI 工具箱已移到侧边栏，不再需要初始化编辑器事件
+    editorRefresh()
+    mdLocalToRemote()
+  })
+})
+
+// 监听暗色模式变化并更新编辑器主题
+watch(isDark, () => {
+  if (codeMirrorView.value) {
+    codeMirrorView.value.dispatch({
+      effects: themeCompartment.reconfigure(theme(isDark.value)),
+    })
+  }
+})
+
+// 历史记录的定时器
+const historyTimer = ref<NodeJS.Timeout>()
+onMounted(() => {
+  // 定时，30 秒记录一次文章的历史记录
+  historyTimer.value = setInterval(() => {
+    const currentPost = store.posts[store.currentPostIndex]
+
+    // 与最后一篇记录对比
+    const pre = (currentPost.history || [])[0]?.content
+    if (pre === currentPost.content) {
+      return
+    }
+
+    currentPost.history ??= []
+    currentPost.history.unshift({
+      content: currentPost.content,
+      datetime: new Date().toLocaleString(`zh-CN`),
+    })
+
+    currentPost.history.length = Math.min(currentPost.history.length, 10)
+  }, 30 * 1000)
+})
+
+// 销毁时清理定时器和全局事件监听器
+onUnmounted(() => {
+  // 清理定时器 - 防止回调访问已销毁的DOM
+  clearTimeout(historyTimer.value)
+  clearTimeout(timeout.value)
+  clearTimeout(changeTimer.value)
+
+  // 清理全局事件监听器 - 防止全局事件触发已销毁的组件
+  document.removeEventListener(`keydown`, handleGlobalKeydown)
 })
 </script>
 
 <template>
-  <div ref="container" class="container flex flex-col">
+  <div class="container flex flex-col">
+    <Progress v-model="progressValue" class="absolute left-0 right-0 rounded-none" style="height: 2px;" />
     <EditorHeader
-      @add-format="addFormat"
-      @format-content="formatContent"
       @start-copy="startCopy"
       @end-copy="endCopy"
     />
-    <main class="container-main flex flex-1 flex-col">
-      <div class="container-main-section border-radius-10 relative flex flex-1 overflow-hidden border-1">
-        <PostSlider />
-        <div
-          ref="codeMirrorWrapper"
-          class="codeMirror-wrapper flex-1"
-          :class="{
-            'order-1 border-l': !store.isEditOnLeft,
-            'border-r': store.isEditOnLeft,
-          }"
-        >
-          <ContextMenu>
-            <ContextMenuTrigger>
-              <textarea
-                id="editor"
-                type="textarea"
-                placeholder="Your markdown text here."
-              />
-            </ContextMenuTrigger>
-            <ContextMenuContent class="w-64">
-              <ContextMenuItem inset @click="toggleShowUploadImgDialog()">
-                上传图片
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="toggleShowInsertFormDialog()">
-                插入表格
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="resetStyleConfirm()">
-                恢复默认样式
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="importDefaultContent()">
-                导入默认文档
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem inset @click="importMarkdownContent()">
-                导入 .md 文档
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="exportEditorContent2MD()">
-                导出 .md 文档
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="exportEditorContent2HTML()">
-                导出 .html
-              </ContextMenuItem>
-              <ContextMenuItem inset @click="formatContent()">
-                格式化
-                <ContextMenuShortcut>{{ altSign }} + {{ shiftSign }} + F</ContextMenuShortcut>
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        </div>
-        <div
-          id="preview"
-          ref="preview"
-          class="preview-wrapper flex-1 p-5"
-        >
-          <div id="output-wrapper" :class="{ output_night: !backLight }">
-            <div class="preview border-x-1 shadow-xl">
-              <section id="output" v-html="output" />
-              <div v-if="isCoping" class="loading-mask">
-                <div class="loading-mask-box">
-                  <div class="loading__img" />
-                  <span>正在生成</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <BackTop target="preview" :right="40" :bottom="40" />
-        </div>
-        <CssEditor class="order-2 flex-1" />
-        <RightSlider class="order-2" />
+    <main class="container-main flex flex-1 flex-col">
+      <div
+        class="container-main-section border-radius-10 relative flex flex-1 overflow-hidden border"
+      >
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel
+            :default-size="15"
+            :max-size="store.isOpenPostSlider ? 30 : 0"
+            :min-size="store.isOpenPostSlider ? 10 : 0"
+          >
+            <PostSlider />
+          </ResizablePanel>
+          <ResizableHandle class="hidden md:block" />
+          <ResizablePanel class="flex">
+            <div
+              v-show="!store.isMobile || (store.isMobile && showEditor)"
+              ref="codeMirrorWrapper"
+              class="codeMirror-wrapper relative flex-1"
+              :class="{
+                'order-1 border-l': !store.isEditOnLeft,
+                'border-r': store.isEditOnLeft,
+              }"
+            >
+              <SearchTab v-if="codeMirrorView" ref="searchTabRef" :editor-view="codeMirrorView as any" />
+              <SidebarAIToolbar
+                :is-mobile="store.isMobile"
+                :show-editor="showEditor"
+              />
+
+              <EditorContextMenu>
+                <div
+                  id="editor"
+                  ref="editorRef"
+                  class="codemirror-container"
+                />
+              </EditorContextMenu>
+            </div>
+            <div
+              v-show="!store.isMobile || (store.isMobile && !showEditor)"
+              class="relative flex-1 overflow-x-hidden transition-width"
+              :class="[store.isOpenRightSlider ? 'w-0' : 'w-100']"
+            >
+              <div
+                id="preview"
+                ref="previewRef"
+                class="preview-wrapper w-full p-5"
+              >
+                <div
+                  id="output-wrapper"
+                  class="w-full"
+                  :class="{ output_night: !backLight }"
+                >
+                  <div
+                    class="preview border-x shadow-xl"
+                    :class="[store.isMobile ? 'w-[100%]' : store.previewWidth]"
+                  >
+                    <section id="output" class="w-full" v-html="output" />
+                    <div v-if="isCoping" class="loading-mask">
+                      <div class="loading-mask-box">
+                        <div class="loading__img" />
+                        <span>正在生成</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <BackTop
+                  target="preview"
+                  :right="store.isMobile ? 24 : 20"
+                  :bottom="store.isMobile ? 90 : 20"
+                />
+              </div>
+
+              <FloatingToc />
+            </div>
+            <CssEditor />
+            <RightSlider />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
-      <footer class="h-[30px] flex select-none items-center justify-end px-4 text-[12px]">
-        字数 {{ readingTime?.words }}， 阅读大约需 {{ Math.ceil(readingTime?.minutes ?? 0) }} 分钟
-      </footer>
+
+      <!-- 移动端浮动按钮组 -->
+      <div v-if="store.isMobile" class="fixed bottom-16 right-6 z-50 flex flex-col gap-2">
+        <!-- 切换编辑/预览按钮 -->
+        <button
+          class="bg-primary flex items-center justify-center rounded-full p-3 text-white shadow-lg transition active:scale-95 hover:scale-105 dark:bg-gray-700 dark:text-white dark:ring-2 dark:ring-white/30"
+          aria-label="切换编辑/预览"
+          @click="toggleView"
+        >
+          <component :is="showEditor ? Eye : Pen" class="h-5 w-5" />
+        </button>
+      </div>
+
+      <!-- AI工具箱已移到侧边栏，这里不再显示 -->
 
       <UploadImgDialog @upload-image="uploadImage" />
 
       <InsertFormDialog />
 
-      <RunLoading />
+      <InsertMpCardDialog />
 
       <AlertDialog v-model:open="store.isOpenConfirmDialog">
         <AlertDialogContent>
@@ -470,6 +668,8 @@ onMounted(async () => {
         </AlertDialogContent>
       </AlertDialog>
     </main>
+
+    <Footer />
   </div>
 </template>
 
@@ -529,6 +729,8 @@ onMounted(async () => {
 }
 
 .codeMirror-wrapper {
-  overflow-x: auto;
+  overflow-x: hidden;
+  height: 100%;
+  position: relative;
 }
 </style>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { cn } from '@renderer/lib/utils'
-import { Separator, type SeparatorProps } from 'radix-vue'
-import { computed, type HTMLAttributes } from 'vue'
+import type { SeparatorProps } from 'radix-vue'
+import type { HTMLAttributes } from 'vue'
+import { Separator } from 'radix-vue'
+import { computed } from 'vue'
+import { cn } from '@/lib/utils'
 
 const props = defineProps<
   SeparatorProps & { class?: HTMLAttributes[`class`], label?: string }
@@ -28,7 +30,7 @@ const delegatedProps = computed(() => {
     <span
       v-if="props.label"
       :class="cn('text-xs text-muted-foreground bg-background absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex justify-center items-center',
-                 props.orientation === 'vertical' ? 'w-[1px] px-1 py-2' : 'h-[1px] py-1 px-2',
+                 props.orientation === 'vertical' ? 'w-px px-1 py-2' : 'h-px py-1 px-2',
       )"
     >{{ props.label }}</span>
   </Separator>

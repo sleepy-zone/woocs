@@ -31,6 +31,9 @@ Markdown 中的段落就是一行接一行的文本。要创建新段落，只�
 - **粗体**：用两个星号或下划线包裹文字，如 `**粗体**` 或 `__粗体__`。
 - _斜体_：用一个星号或下划线包裹文字，如 `*斜体*` 或 `_斜体_`。
 - ~~删除线~~：用两个波浪线包裹文字，如 `~~删除线~~`。
+- ==高亮==：用两个等号包裹文字，如 `==高亮==`。
+- ++下划线++：用两个加号包裹文字，如 `++下划线++`。
+- ~波浪线~：用一个波浪线包裹文字，如 `~波浪线~`。
 
 这些简单的标记可以让你的内容更有层次感和重点突出。
 
@@ -54,15 +57,17 @@ Markdown 中的段落就是一行接一行的文本。要创建新段落，只�
 - **链接**：用方括号和圆括号创建链接 `[显示文本](链接地址)`。
 - **图片**：和链接类似，只需在前面加上 `!`，如 `![描述文本](图片链接)`。
 
-[访问 woocs](https://github.com/woocs)
+[访问 Doocs](https://github.com/doocs)
 
-![woocs](https://cloud-minapp-47803.cloud.ifanrusercontent.com/1tvAaMjiUvbKRhX7.png)
+![doocs](https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/gh/doocs/md/images/logo-2.png)
 
 轻松实现富媒体内容展示！
 
 > 因微信公众号平台不支持除公众号内容以外的链接，故其他平台的链接，会呈现链接样式但无法点击跳转。
 
 > 对于这些链接请注意明文书写，或点击左上角「格式->微信外链接转底部引用」开启引用，这样就可以在底部观察到链接指向。
+
+另外，使用 `<![alt](url),![alt](url)>` 语法可以创建横屏滑动幻灯片，支持微信公众号平台。建议使用相似尺寸的图片以获得最佳显示效果。
 
 ### 6. 引用：引用名言或引人深思的句子
 
@@ -80,7 +85,7 @@ Markdown 中的段落就是一行接一行的文本。要创建新段落，只�
 - **代码块**：用三个反引号包裹，并指定语言，如：
 
 ```js
-console.log("Hello, woocs!");
+console.log(`Hello, Doocs!`)
 ```
 
 语法高亮让你的代码更易读。
@@ -125,6 +130,29 @@ d_{x + 1, y + 1} &\leftarrow d_{x + 1, y + 1} + 1
 \end{aligned}
 $$
 
+现在还支持 **LaTeX 标准格式**：
+
+- **行内公式**：用 `\(...\)` 包裹公式，如 \(x^2 + y^2 = z^2\)。
+- **块级公式**：用 `\[...\]` 包裹公式，如：
+
+\[
+\int\_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
+\]
+
+混合使用示例：传统格式 $a + b = c$ 和 LaTeX 格式 \(d + e = f\) 可以在同一段落中共存。
+
+1. 列表内块公式 1
+
+$$
+\chi^2 = \sum \frac{(O - E)^2}{E}
+$$
+
+2. 列表内块公式 2
+
+$$
+\chi^2 = \sum \frac{(|O - E| - 0.5)^2}{E}
+$$
+
 这是展示复杂数学表达的利器！
 
 ### 2. Mermaid 流程图：可视化流程
@@ -136,7 +164,7 @@ graph LR
   A[GraphCommand] --> B[update]
   A --> C[goto]
   A --> D[send]
-  
+
   B --> B1[更新状态]
   C --> C1[流程控制]
   D --> D1[消息传递]
@@ -172,6 +200,71 @@ pie
 
 > 更多用法，参见：[Mermaid User Guide](https://mermaid.js.org/intro/getting-started.html)。
 
+### 3. PlantUML 流程图：可视化流程
+
+PlantUML 是强大的可视化工具，可以在 Markdown 中创建流程图、时序图等。
+
+```plantuml
+@startuml
+participant Participant as Foo
+actor       Actor       as Foo1
+boundary    Boundary    as Foo2
+control     Control     as Foo3
+entity      Entity      as Foo4
+database    Database    as Foo5
+collections Collections as Foo6
+queue       Queue       as Foo7
+Foo -> Foo1 : To actor
+Foo -> Foo2 : To boundary
+Foo -> Foo3 : To control
+Foo -> Foo4 : To entity
+Foo -> Foo5 : To database
+Foo -> Foo6 : To collections
+Foo -> Foo7: To queue
+@enduml
+```
+
+> 更多用法，参见：[PlantUML 主页](https://plantuml.com/zh/)。
+
+### 4. Ruby 注音：注音标注
+
+支持两种格式：
+
+```md
+1. [文字]{注音}
+2. [文字]^(注音)
+```
+
+渲染效果如下：
+
+[你好]{nǐ hǎo} [世界]{shì jiè}
+
+支持四种分隔符： `・`（中点）、`．` (全角句点)、`。` (中文句号)、`-` (英文减号)
+
+示例：
+
+```md
+[你好世界]{nǐ・hǎo・shì・jiè}
+[小夜時雨]^(さ・よ・しぐれ)
+```
+
+[你好世界]{nǐ・hǎo・shì・jiè}
+[小夜時雨]^(さ・よ・しぐれ)
+
+当字符串数量与分隔符数量不匹配时，会自动匹配到最合适的分隔符。
+
+```md
+[小夜時雨]{さ・よ・しぐれ}
+[小夜時雨]{さ・よ}
+[小夜]{さ・よ・しぐれ}
+[小夜時雨]{さ・よ・しぐれ・extra}
+```
+
+[小夜時雨]{さ・よ・しぐれ}
+[小夜時雨]{さ・よ}
+[小夜]{さ・よ・しぐれ}
+[小夜時雨]{さ・よ・しぐれ・extra}
+
 ## 结语
 
 Markdown 是一种简单、强大且易于掌握的标记语言，通过学习基础和进阶语法，你可以快速创作内容并有效传达信息。无论是技术文档、个人博客还是项目说明，Markdown 都是你的得力助手。希望这篇内容能够带你全面了解 Markdown 的潜力，让你的写作更加丰富多彩！
@@ -188,5 +281,5 @@ Markdown 是一种简单、强大且易于掌握的标记语言，通过学习�
 ---
 
 <center>
-    <img src="https://cloud-minapp-47803.cloud.ifanrusercontent.com/1tvAM68Cvrx3bfLR.jpg" style="width: 100px;">
+    <img src="https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/gh/doocs/md/images/1648303220922-7e14aefa-816e-44c1-8604-ade709ca1c69.png" style="width: 100px;">
 </center>

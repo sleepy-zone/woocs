@@ -1,46 +1,28 @@
 <script setup lang="ts">
-import CodemirrorEditor from '@renderer/views/CodemirrorEditor.vue'
-import emitter from './utils/event';
-import { useStore } from '@renderer/stores'
+import { onMounted, ref } from 'vue'
+import { Toaster } from '@/components/ui/sonner'
+import CodemirrorEditor from '@/views/CodemirrorEditor.vue'
 
 const store = useStore()
-
-const {
-  exportEditorContent2HTML,
-  exportEditorContent2MD,
-  importMarkdownContent,
-} = store
-
-const handleMessageAction = (action: string, payload: any) => {
-  switch (action) {
-    case 'new-file':
-    case 'about':
-    case 'settings':
-      emitter.emit(action);
-      break;
-    case 'open-file':
-      importMarkdownContent();
-      break;
-    case 'export-md':
-      exportEditorContent2MD();
-      break;
-    case 'export-html':
-      exportEditorContent2HTML();
-      break;
-    default:
-      break;
-  }
-}
+const isUtools = ref(false)
 
 onMounted(() => {
-  window.$api.onMessage((data) => {
-    handleMessageAction(data.action, data.payload);
-  });
+  // 检测是否为 Utools 环境
+  isUtools.value = !!(window as any).__MD_UTOOLS__
+  if (isUtools.value) {
+    document.documentElement.classList.add(`is-utools`)
+  }
 })
 </script>
 
 <template>
+  <AppSplash />
   <CodemirrorEditor />
+  <Toaster
+    rich-colors
+    position="top-center"
+    :theme="store.isDark ? 'dark' : 'light'"
+  />
 </template>
 
 <style lang="less">
@@ -61,7 +43,7 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
-  background-color: #ffffff;
+  background-color: rgba(243, 244, 247, 0.5);
 }
 
 ::-webkit-scrollbar-track {
@@ -72,6 +54,23 @@ body {
 ::-webkit-scrollbar-thumb {
   border-radius: 6px;
   background-color: rgba(144, 146, 152, 0.5);
+}
+
+// Utools 模式下隐藏所有滚动条
+.is-utools {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  // Firefox
+  * {
+    scrollbar-width: none;
+  }
+
+  // IE and Edge
+  * {
+    -ms-overflow-style: none;
+  }
 }
 
 /* CSS-hints */
@@ -109,13 +108,10 @@ body {
     background: #f0f0f0;
   }
 }
-
-.draggable-area {
-  -webkit-app-region: drag;
+.search-match {
+  background-color: #ffeb3b; /* 所有匹配项颜色 */
 }
-
-/* 对于不想被拖拽的子元素（如按钮等控件）*/
-.no-drag {
-  -webkit-app-region: no-drag;
+.current-match {
+  background-color: #ff5722; /* 当前匹配项更鲜艳的颜色 */
 }
 </style>
