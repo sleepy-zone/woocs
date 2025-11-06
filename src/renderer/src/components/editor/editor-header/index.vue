@@ -192,10 +192,10 @@ async function copy() {
 
 <template>
   <header
-    class="header-container h-15 flex flex-wrap items-center justify-between px-5 relative"
+    class="header-container h-12 flex flex-wrap items-center justify-between px-25 relative draggable-area"
   >
     <!-- 桌面端左侧菜单 -->
-    <div class="space-x-2 hidden md:flex">
+    <div class="space-x-2 hidden md:flex no-drag">
       <Menubar class="menubar border-0">
         <FileDropdown @open-editor-state="handleOpenEditorState" />
         <FormatDropdown />
@@ -206,7 +206,7 @@ async function copy() {
     </div>
 
     <!-- 移动端汉堡菜单按钮 -->
-    <div class="md:hidden">
+    <div class="md:hidden no-drag">
       <Menubar class="menubar border-0 p-0">
         <MenubarMenu>
           <MenubarTrigger class="p-0">
@@ -226,7 +226,7 @@ async function copy() {
     </div>
 
     <!-- 右侧操作区 -->
-    <div class="space-x-2 flex flex-wrap items-center">
+    <div class="space-x-2 flex flex-wrap items-center no-drag">
       <!-- 复制按钮组 -->
       <div
         class="bg-background space-x-1 text-background-foreground flex items-center border rounded-md"

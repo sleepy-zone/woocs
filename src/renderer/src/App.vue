@@ -114,4 +114,13 @@ body {
 .current-match {
   background-color: #ff5722; /* 当前匹配项更鲜艳的颜色 */
 }
+
+.draggable-area {
+  -webkit-app-region: drag;
+}
+
+/* 对于不想被拖拽的子元素（如按钮等控件）*/
+.no-drag {
+  -webkit-app-region: no-drag;
+}
 </style>
