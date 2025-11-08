@@ -424,7 +424,7 @@ function createFormTextArea(dom: HTMLDivElement) {
         if (update.docChanged) {
           const value = update.state.doc.toString()
           clearTimeout(changeTimer.value)
-          changeTimer.value = setTimeout(() => {
+          changeTimer.value = setTimeout(async () => {
             editorRefresh()
 
             const currentPost = store.posts[store.currentPostIndex]
@@ -438,6 +438,13 @@ function createFormTextArea(dom: HTMLDivElement) {
 
             currentPost.updateDatetime = new Date()
             currentPost.content = value
+            
+            // 保存到文件系统
+            try {
+              await window.$api.updatePost(currentPost.title, value)
+            } catch (error) {
+              console.error('Failed to save post content:', error)
+            }
           }, 300)
         }
       }),
