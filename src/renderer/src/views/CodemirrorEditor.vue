@@ -545,11 +545,15 @@ onMounted(() => {
     })
     currentPost.history.length = Math.min(currentPost.history.length, 10)
 
-    // 保存到文件系统
+    // 保存到文件系统 - 创建纯对象副本以避免克隆错误
     try {
-      await window.$api.savePostHistory(currentPost.title, {
-        items: currentPost.history
-      })
+      const historyToSave = {
+        items: currentPost.history.map(item => ({
+          content: item.content,
+          datetime: item.datetime
+        }))
+      }
+      await window.$api.savePostHistory(currentPost.title, historyToSave)
     } catch (error) {
       console.error('Failed to save post history:', error)
     }

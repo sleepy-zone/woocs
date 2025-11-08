@@ -90,20 +90,33 @@ function openHistoryDialog(id: string) {
   currentHistoryIndex.value = 0
   isOpenHistoryDialog.value = true
 }
-function recoverHistory() {
+async function recoverHistory() {
   const post = store.getPostById(currentPostId.value!)
-  if (!post) {
+  if (!post || !post.history || !post.history[currentHistoryIndex.value]) {
     isOpenHistoryDialog.value = false
+    toast.error('历史记录不存在')
     return
   }
 
   const content = post.history[currentHistoryIndex.value].content
   post.content = content
+  post.updateDatetime = new Date()
+  
+  // 更新编辑器
   const editor = toRaw(store.editor!)
   editor.dispatch({
     changes: { from: 0, to: editor.state.doc.length, insert: content },
   })
-  toast.success(`记录恢复成功`)
+  
+  // 保存到文件系统
+  try {
+    await window.$api.updatePost(post.title, content)
+    toast.success(`记录恢复成功`)
+  } catch (error) {
+    console.error('Failed to save recovered content:', error)
+    toast.error('恢复成功但保存失败')
+  }
+  
   isOpenHistoryDialog.value = false
 }
 
@@ -377,7 +390,7 @@ function handleDragEnd() {
             class="whitespace-pre-wrap p-2"
             style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; hyphens: auto;"
           >
-            {{ store.getPostById(currentPostId!)?.history[currentHistoryIndex].content ?? '' }}
+            {{ store.getPostById(currentPostId!)?.history?.[currentHistoryIndex]?.content ?? '' }}
           </div>
         </div>
       </div>
