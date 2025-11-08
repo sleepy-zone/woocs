@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowUpNarrowWide, ChevronsDownUp, ChevronsUpDown, PlusSquare, X } from 'lucide-vue-next'
+import { ArrowUpNarrowWide, PlusSquare, RefreshCw, X } from 'lucide-vue-next'
 import { useStore } from '@/stores'
 import { addPrefix } from '@/utils'
 
@@ -22,31 +22,20 @@ watch(() => store.isMobile, () => {
 })
 
 /* ============ 新增内容 ============ */
-const parentId = ref<string | null>(null)
 const isOpenAddDialog = ref(false)
 const addPostInputVal = ref(``)
 watch(isOpenAddDialog, (o) => {
   if (o) {
     addPostInputVal.value = ``
-    parentId.value = null
   }
 })
 
-function openAddPostDialog(id: string) {
-  isOpenAddDialog.value = true
-  nextTick(() => {
-    parentId.value = id
-  })
-}
-
-function addPost() {
+async function addPost() {
   if (!addPostInputVal.value.trim())
     return toast.error(`内容标题不可为空`)
-  if (store.posts.some(post => post.title === addPostInputVal.value.trim()))
-    return toast.error(`内容标题已存在`)
-  store.addPost(addPostInputVal.value.trim(), parentId.value)
+  
+  await store.addPost(addPostInputVal.value.trim())
   isOpenAddDialog.value = false
-  toast.success(`内容新增成功`)
 }
 
 /* ============ 重命名 / 删除 / 历史 对象 ============ */
@@ -59,17 +48,9 @@ function startRenamePost(id: string) {
   renamePostInputVal.value = store.getPostById(id)!.title
   isOpenEditDialog.value = true
 }
-function renamePost() {
+async function renamePost() {
   if (!renamePostInputVal.value.trim()) {
     return toast.error(`内容标题不可为空`)
-  }
-
-  if (
-    store.posts.some(
-      post => post.title === renamePostInputVal.value.trim() && post.id !== editId.value,
-    )
-  ) {
-    return toast.error(`内容标题已存在`)
   }
 
   if (renamePostInputVal.value === store.getPostById(editId.value!)?.title) {
@@ -77,8 +58,7 @@ function renamePost() {
     return
   }
 
-  store.renamePost(editId.value!, renamePostInputVal.value.trim())
-  toast.success(`内容重命名成功`)
+  await store.renamePost(editId.value!, renamePostInputVal.value.trim())
   isOpenEditDialog.value = false
 }
 
@@ -95,10 +75,9 @@ function startDelPost(id: string) {
   delId.value = id
   isOpenDelPostConfirmDialog.value = true
 }
-function delPost() {
-  store.delPost(delId.value!)
+async function delPost() {
+  await store.delPost(delId.value!)
   isOpenDelPostConfirmDialog.value = false
-  toast.success(`内容删除成功`)
 }
 
 /* ============ 历史记录 ============ */
@@ -150,42 +129,13 @@ const sortedPosts = computed(() => {
   })
 })
 
-/* ============ 拖拽功能 ============ */
+/* ============ 拖拽功能 - 简化为仅排序 ============ */
 const dragover = ref(false)
 const dragSourceId = ref<string | null>(null)
 const dropTargetId = ref<string | null>(null)
 
 function handleDrop(targetId: string | null) {
-  const sourceId = dragSourceId.value
-  if (!sourceId) {
-    return
-  }
-
-  // 递归检索 ID，是不是父文件拖拽到了子文件上面
-  const isParent = (id: string | null | undefined) => {
-    if (!id) {
-      return false
-    }
-
-    const post = store.getPostById(id)
-    if (!post) {
-      return false
-    }
-
-    if (post.parentId === sourceId) {
-      return true
-    }
-
-    return isParent(post.parentId)
-  }
-
-  if (isParent(targetId)) {
-    toast.error(`不能将内容拖拽到其子内容下面`)
-  }
-  else if (sourceId !== targetId) {
-    store.updatePostParentId(sourceId, targetId || null)
-  }
-
+  // TODO: 实现拖拽排序逻辑
   dragSourceId.value = null
 }
 
@@ -318,28 +268,16 @@ function handleDragEnd() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <!-- 刷新按钮 -->
         <TooltipProvider :delay-duration="200">
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="xs" class="h-max p-1" @click="store.collapseAllPosts">
-                <ChevronsDownUp class="size-5" />
+              <Button variant="ghost" size="xs" class="h-max p-1" @click="store.refreshPosts">
+                <RefreshCw class="size-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              全部收起
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
-        <TooltipProvider :delay-duration="200">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="ghost" size="xs" class="h-max p-1" @click="store.expandAllPosts">
-                <ChevronsUpDown class="size-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              全部展开
+              刷新列表
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -347,10 +285,10 @@ function handleDragEnd() {
 
       <!-- 列表 -->
       <div class="flex-1 overflow-y-auto space-y-1 px-1">
-        <!-- 包裹根文章和子文章，保持间距 -->
         <PostItem
-          :parent-id="null"
-          :sorted-posts="sortedPosts"
+          v-for="post in sortedPosts"
+          :key="post.id"
+          :post="post"
           :start-rename-post="startRenamePost"
           :open-history-dialog="openHistoryDialog"
           :start-del-post="startDelPost"
@@ -360,7 +298,6 @@ function handleDragEnd() {
           :set-drag-source-id="(id: string | null) => (dragSourceId = id)"
           :handle-drop="handleDrop"
           :handle-drag-end="handleDragEnd"
-          :open-add-post-dialog="openAddPostDialog"
         />
       </div>
     </nav>

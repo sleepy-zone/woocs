@@ -34,21 +34,7 @@ import { copyPlain } from '@/utils/clipboard'
 /**********************************
  * Post 结构接口
  *********************************/
-interface Post {
-  id: string
-  title: string
-  content: string
-  history: {
-    datetime: string
-    content: string
-  }[]
-  createDatetime: Date
-  updateDatetime: Date
-  // 父标签
-  parentId?: string | null
-  // 展开状态
-  collapsed?: boolean
-}
+import type { Post } from '@/types/post'
 
 export const useStore = defineStore(`store`, () => {
   // 是否开启深色模式
@@ -115,20 +101,9 @@ export const useStore = defineStore(`store`, () => {
   const isOpenPostSlider = useStorage(addPrefix(`is_open_post_slider`), false)
 
   /*******************************
-   * 内容列表 posts：默认就带 id
+   * 内容列表 posts：从文件系统加载
    ******************************/
-  const posts = useStorage<Post[]>(addPrefix(`posts`), [
-    {
-      id: uuid(),
-      title: `内容1`,
-      content: DEFAULT_CONTENT,
-      history: [
-        { datetime: new Date().toLocaleString(`zh-cn`), content: DEFAULT_CONTENT },
-      ],
-      createDatetime: new Date(),
-      updateDatetime: new Date(),
-    },
-  ])
+  const posts = ref<Post[]>([])
 
   // currentPostId 先存空串
   const currentPostId = useStorage(addPrefix(`current_post_id`), ``)
@@ -183,69 +158,134 @@ export const useStore = defineStore(`store`, () => {
   const getPostById = (id: string) => posts.value.find(p => p.id === id)
 
   /********************************
-   * CRUD
+   * 从文件系统加载所有文章
    ********************************/
-  const addPost = (title: string, parentId: string | null = null) => {
-    const newPost: Post = {
-      id: uuid(),
-      title,
-      content: `# ${title}`,
-      history: [
-        { datetime: new Date().toLocaleString(`zh-cn`), content: `# ${title}` },
-      ],
-      createDatetime: new Date(),
-      updateDatetime: new Date(),
-      parentId,
-    }
-    posts.value.push(newPost)
-    currentPostId.value = newPost.id
-  }
-
-  const renamePost = (id: string, title: string) => {
-    const post = getPostById(id)
-    if (post)
-      post.title = title
-  }
-
-  const delPost = (id: string) => {
-    const idx = findIndexById(id)
-    if (idx === -1)
-      return
-    posts.value.splice(idx, 1)
-    currentPostId.value = posts.value[Math.min(idx, posts.value.length - 1)]?.id ?? ``
-  }
-
-  const updatePostParentId = (postId: string, parentId: string | null) => {
-    const post = getPostById(postId)
-    if (post) {
-      post.parentId = parentId
-      post.updateDatetime = new Date()
+  const loadPostsFromFileSystem = async () => {
+    try {
+      const fileInfos = await window.$api.listPosts()
+      
+      const loadedPosts = await Promise.all(
+        fileInfos.map(async (fileInfo) => {
+          const filename = fileInfo.name.replace('.md', '')
+          const content = await window.$api.getPost(filename)
+          const historyData = await window.$api.getPostHistory(filename)
+          
+          return {
+            id: filename,
+            title: filename,
+            content: content || '',
+            createDatetime: new Date(fileInfo.createTime),
+            updateDatetime: new Date(fileInfo.modifyTime),
+            history: historyData?.items || [],
+          }
+        })
+      )
+      
+      posts.value = loadedPosts
+      
+      // 如果当前选中的文章不存在，选中第一篇
+      if (!posts.value.some(p => p.id === currentPostId.value)) {
+        currentPostId.value = posts.value[0]?.id || ''
+      }
+    } catch (error) {
+      console.error('Failed to load posts from file system:', error)
+      toast.error('加载文章列表失败')
     }
   }
 
-  // 收起所有文章
-  const collapseAllPosts = () => {
-    posts.value.forEach((post) => {
-      post.collapsed = true
-    })
-  }
-
-  // 展开所有文章
-  const expandAllPosts = () => {
-    posts.value.forEach((post) => {
-      post.collapsed = false
-    })
+  // 刷新文章列表
+  const refreshPosts = async () => {
+    await loadPostsFromFileSystem()
+    toast.success('文章列表已刷新')
   }
 
   /********************************
-   * 同步编辑器内容
+   * CRUD - 调用文件系统 API
    ********************************/
-  watch(currentPostId, () => {
+  const addPost = async (title: string) => {
+    if (posts.value.some(p => p.title === title)) {
+      toast.error('文章标题已存在')
+      return
+    }
+    
+    const content = `# ${title}`
+    const filePath = await window.$api.addPost2Local(title, content)
+    
+    if (filePath) {
+      await loadPostsFromFileSystem()
+      currentPostId.value = title
+      toast.success('文章创建成功')
+    } else {
+      toast.error('文章创建失败')
+    }
+  }
+
+  const renamePost = async (id: string, newTitle: string) => {
+    const post = getPostById(id)
+    if (!post) return
+    
+    if (posts.value.some(p => p.title === newTitle && p.id !== id)) {
+      toast.error('文章标题已存在')
+      return
+    }
+    
+    const filePath = await window.$api.renamePost(post.title, newTitle)
+    
+    if (filePath) {
+      await loadPostsFromFileSystem()
+      currentPostId.value = newTitle
+      toast.success('重命名成功')
+    } else {
+      toast.error('重命名失败')
+    }
+  }
+
+  const delPost = async (id: string) => {
+    const post = getPostById(id)
+    if (!post) return
+    
+    const filePath = await window.$api.removePost(post.title)
+    
+    if (filePath) {
+      await loadPostsFromFileSystem()
+      toast.success('删除成功')
+    } else {
+      toast.error('删除失败')
+    }
+  }
+
+  // TODO: Remove after migration - 这些函数将被移除
+  const updatePostParentId = (postId: string, parentId: string | null) => {
+    console.warn('updatePostParentId is deprecated and will be removed')
+  }
+
+  const collapseAllPosts = () => {
+    console.warn('collapseAllPosts is deprecated and will be removed')
+  }
+
+  const expandAllPosts = () => {
+    console.warn('expandAllPosts is deprecated and will be removed')
+  }
+
+  /********************************
+   * 同步编辑器内容 - 从文件系统读取
+   ********************************/
+  watch(currentPostId, async () => {
     const post = getPostById(currentPostId.value)
     if (post && editor.value) {
-      editor.value.dispatch({
-        changes: { from: 0, to: editor.value.state.doc.length, insert: post.content },
-      })
+      // 从文件系统读取最新内容
+      try {
+        const content = await window.$api.getPost(post.title)
+        editor.value.dispatch({
+          changes: { from: 0, to: editor.value.state.doc.length, insert: content || post.content },
+        })
+      } catch (error) {
+        console.error('Failed to load post content:', error)
+        // 如果读取失败，使用内存中的内容
+        editor.value.dispatch({
+          changes: { from: 0, to: editor.value.state.doc.length, insert: post.content },
+        })
+      }
     }
   })
 
@@ -805,6 +845,8 @@ export const useStore = defineStore(`store`, () => {
     addPost,
     renamePost,
     delPost,
+    loadPostsFromFileSystem,
+    refreshPosts,
     isOpenPostSlider,
     isOpenRightSlider,
 

@@ -6,12 +6,15 @@ import CodemirrorEditor from '@/views/CodemirrorEditor.vue'
 const store = useStore()
 const isUtools = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   // 检测是否为 Utools 环境
   isUtools.value = !!(window as any).__MD_UTOOLS__
   if (isUtools.value) {
     document.documentElement.classList.add(`is-utools`)
   }
+
+  // 从文件系统加载文章列表
+  await store.loadPostsFromFileSystem()
 })
 </script>
 

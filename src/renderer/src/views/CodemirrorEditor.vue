@@ -408,9 +408,13 @@ const editorRef = useTemplateRef<HTMLDivElement>(`editorRef`)
 const progressValue = ref(0)
 
 function createFormTextArea(dom: HTMLDivElement) {
+  // 获取当前文章内容，如果不存在则使用空字符串
+  const currentPost = store.posts[store.currentPostIndex]
+  const initialContent = currentPost?.content || ''
+  
   // 创建编辑器状态
   const state = EditorState.create({
-    doc: store.posts[store.currentPostIndex].content,
+    doc: initialContent,
     extensions: [
       markdownSetup({
         onSearch: openSearchWithSelection,
@@ -424,6 +428,10 @@ function createFormTextArea(dom: HTMLDivElement) {
             editorRefresh()
 
             const currentPost = store.posts[store.currentPostIndex]
+            if (!currentPost) {
+              return
+            }
+            
             if (value === currentPost.content) {
               return
             }
@@ -512,8 +520,9 @@ watch(isDark, () => {
 const historyTimer = ref<NodeJS.Timeout>()
 onMounted(() => {
   // 定时，30 秒记录一次文章的历史记录
-  historyTimer.value = setInterval(() => {
+  historyTimer.value = setInterval(async () => {
     const currentPost = store.posts[store.currentPostIndex]
+    if (!currentPost) return
 
     // 与最后一篇记录对比
     const pre = (currentPost.history || [])[0]?.content
@@ -521,13 +530,22 @@ onMounted(() => {
       return
     }
 
+    // 更新内存中的历史记录
     currentPost.history ??= []
     currentPost.history.unshift({
       content: currentPost.content,
       datetime: new Date().toLocaleString(`zh-CN`),
     })
-
     currentPost.history.length = Math.min(currentPost.history.length, 10)
+
+    // 保存到文件系统
+    try {
+      await window.$api.savePostHistory(currentPost.title, {
+        items: currentPost.history
+      })
+    } catch (error) {
+      console.error('Failed to save post history:', error)
+    }
   }, 30 * 1000)
 })
 

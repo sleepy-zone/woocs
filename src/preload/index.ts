@@ -5,6 +5,9 @@ import { defaultDocumentName, defaultDocumentPath } from '../main/local'
 // Custom APIs for renderer
 const api = {
   onMessage: (callback) => ipcRenderer.on('message-to-renderer', (_, ...args) => callback(...args)),
+  listPosts: () => ipcRenderer.invoke('list-posts'),
+  getPostHistory: (filename) => ipcRenderer.invoke('get-post-history', { filename }),
+  savePostHistory: (filename, history) => ipcRenderer.invoke('save-post-history', { filename, history }),
   addPost2Local: (title, content) => ipcRenderer.invoke('add-post', { title, content }),
   renamePost: (originTitle, newTitle) => ipcRenderer.invoke('rename-post', { originTitle, newTitle }),
   removePost: (title) => ipcRenderer.invoke('remove-post', { title }),

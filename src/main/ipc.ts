@@ -1,25 +1,39 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
-import { writeContent2File, updateContent2File, defaultAppDir, renameFile, removeFile, getFileContent } from './local'
+import { writeContent2File, updateContent2File, getAppDir, renameFile, removeFile, getFileContent, listAllMarkdownFiles, readHistoryFile, writeHistoryFile } from './local'
 
 export const initIpcMain = () => {
+  const appDir = getAppDir();
+
+  ipcMain.handle('list-posts', async () => {
+    return await listAllMarkdownFiles(appDir);
+  })
+
+  ipcMain.handle('get-post-history', async (_, { filename }) => {
+    return await readHistoryFile(appDir, filename);
+  })
+
+  ipcMain.handle('save-post-history', async (_, { filename, history }) => {
+    return await writeHistoryFile(appDir, filename, history);
+  })
+
   ipcMain.handle('add-post', async (_, { title, content }) => {
-    return writeContent2File(defaultAppDir, `${title}.md`, content);
+    return writeContent2File(appDir, `${title}.md`, content);
   })
 
   ipcMain.handle('rename-post', async (_, { originTitle, newTitle }) => {
-    return renameFile(defaultAppDir, `${originTitle}.md`, `${newTitle}.md`);
+    return renameFile(appDir, `${originTitle}.md`, `${newTitle}.md`);
   })
 
   ipcMain.handle('remove-post', async (_, { title }) => {
-    return removeFile(defaultAppDir, `${title}.md`);
+    return removeFile(appDir, `${title}.md`);
   })
 
   ipcMain.handle('update-post', async (_, { title, content }) => {
-    return updateContent2File(defaultAppDir, `${title}.md`, content);
+    return updateContent2File(appDir, `${title}.md`, content);
   })
 
   ipcMain.handle('get-post', async (_, { title }) => {
-    return getFileContent(defaultAppDir, `${title}.md`);
+    return getFileContent(appDir, `${title}.md`);
   })
 
   ipcMain.handle('import-post', async () => {
