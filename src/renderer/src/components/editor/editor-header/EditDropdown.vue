@@ -21,7 +21,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
       编辑
     </MenubarSubTrigger>
     <MenubarSubContent>
-      <MenubarItem @click="undo()">
+      <!-- <MenubarItem @click="undo()">
         <Undo2Icon class="mr-2 h-4 w-4" />
         撤销
       </MenubarItem>
@@ -29,7 +29,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
         <Redo2Icon class="mr-2 h-4 w-4" />
         重做
       </MenubarItem>
-      <MenubarSeparator />
+      <MenubarSeparator /> -->
       <MenubarItem @click="toggleShowUploadImgDialog()">
         <UploadCloudIcon class="mr-2 h-4 w-4" />
         上传图片
@@ -60,7 +60,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
       编辑
     </MenubarTrigger>
     <MenubarContent align="start">
-      <MenubarItem @click="undo()">
+      <!-- <MenubarItem @click="undo()">
         <Undo2Icon class="mr-2 h-4 w-4" />
         撤销
       </MenubarItem>
@@ -68,7 +68,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
         <Redo2Icon class="mr-2 h-4 w-4" />
         重做
       </MenubarItem>
-      <MenubarSeparator />
+      <MenubarSeparator /> -->
       <MenubarItem @click="toggleShowUploadImgDialog()">
         <UploadCloudIcon class="mr-2 h-4 w-4" />
         上传图片

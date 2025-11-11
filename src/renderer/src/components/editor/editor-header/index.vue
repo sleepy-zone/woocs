@@ -192,7 +192,7 @@ async function copy() {
 
 <template>
   <header
-    class="header-container h-12 flex flex-wrap items-center justify-between px-25 relative draggable-area"
+    class="header-container h-10 flex flex-wrap items-center justify-between pr-10 pl-24 relative draggable-area"
   >
     <!-- 桌面端左侧菜单 -->
     <div class="space-x-2 hidden md:flex no-drag">
@@ -231,13 +231,13 @@ async function copy() {
       <div
         class="bg-background space-x-1 text-background-foreground flex items-center border rounded-md"
       >
-        <Button variant="ghost" class="shadow-none text-sm px-2 md:px-4" @click="copy">
+        <Button variant="ghost" size="sm" class="shadow-none text-sm px-2 md:px-4 h-8" @click="copy">
           复制
         </Button>
         <Separator orientation="vertical" class="h-5" />
         <DropdownMenu v-model="copyMode">
           <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="px-2 shadow-none">
+            <Button variant="ghost" class="px-2 shadow-none h-8">
               <ChevronDownIcon class="text-secondary-foreground h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -264,12 +264,12 @@ async function copy() {
       </div>
 
       <!-- 文章信息（移动端隐藏） -->
-      <PostInfo class="hidden md:inline-flex" />
+      <!-- <PostInfo class="hidden md:inline-flex" /> -->
 
       <!-- 编辑器设置按钮 -->
       <Popover>
         <PopoverTrigger as-child>
-          <Button variant="outline" size="icon" class="mr-1">
+          <Button variant="outline" size="icon" class="mr-1 h-8">
             <SlidersHorizontal class="size-4" />
           </Button>
         </PopoverTrigger>
@@ -282,6 +282,7 @@ async function copy() {
       <Button
         variant="outline"
         size="icon"
+        class="h-8"
         @click="store.isOpenRightSlider = !store.isOpenRightSlider"
       >
         <Palette class="size-4" />
