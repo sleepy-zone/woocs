@@ -62,13 +62,14 @@ const template = [
         accelerator: 'Shift+CmdOrCtrl+I',
         click: () => {
           send2Render({
-            action: 'open-file'
+            action: 'import-md'
           })
         }
       },
       { type: 'separator' },
       {
         label: '导出 .md',
+        accelerator: 'CmdOrCtrl+E',
         click: () => {
           send2Render({
             action: 'export-md'
@@ -77,12 +78,47 @@ const template = [
       },
       {
         label: '导出 .html',
+        accelerator: 'CmdOrCtrl+Shift+E',
         click: () => {
           send2Render({
             action: 'export-html'
           })
         }
+      },
+      {
+        label: '导出 .html（无样式）',
+        click: () => {
+          send2Render({
+            action: 'export-pure-html'
+          })
+        }
+      },
+      {
+        label: '导出 .pdf',
+        accelerator: 'CmdOrCtrl+P',
+        click: () => {
+          send2Render({
+            action: 'export-pdf'
+          })
+        }
+      },
+      {
+        label: '导出 .png',
+        click: () => {
+          send2Render({
+            action: 'export-png'
+          })
+        }
        },
+      { type: 'separator' },
+      {
+        label: '导入/导出项目配置',
+        click: () => {
+          send2Render({
+            action: 'editor-state'
+          })
+        }
+      },
       { type: 'separator' },
       isMac ? { role: 'close' } : { role: 'quit' },
       ...(
@@ -171,7 +207,7 @@ const template = [
       {
         label: 'Learn More',
         click: async () => {
-          await shell.openExternal('https://electronjs.org')
+          await shell.openExternal('https://github.com/sleepy-zone/woocs')
         }
       }
     ]

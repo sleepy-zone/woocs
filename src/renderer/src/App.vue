@@ -15,6 +15,55 @@ onMounted(async () => {
 
   // 从文件系统加载文章列表
   await store.loadPostsFromFileSystem()
+
+  // 监听来自主进程的消息
+  window.$api.onMessage(async (data: { action: string }) => {
+    switch (data.action) {
+      case 'new-file':
+        // 触发新建文章
+        store.addPost('新建文章')
+        break
+      case 'import-md':
+        // 触发导入 Markdown
+        const { useImportMarkdownContent } = await import('@/composables/index')
+        const importMarkdownContent = useImportMarkdownContent()
+        importMarkdownContent()
+        break
+      case 'export-md':
+        // 触发导出 Markdown
+        store.exportEditorContent2MD()
+        break
+      case 'export-html':
+        // 触发导出 HTML
+        store.exportEditorContent2HTML()
+        break
+      case 'export-pure-html':
+        // 触发导出无样式 HTML
+        store.exportEditorContent2PureHTML()
+        break
+      case 'export-pdf':
+        // 触发导出 PDF
+        store.exportEditorContent2PDF()
+        break
+      case 'export-png':
+        // 触发导出 PNG
+        store.downloadAsCardImage()
+        break
+      case 'editor-state':
+        // 触发编辑器状态对话框
+        // 这里需要找到对应的组件或方法
+        console.log('Open editor state dialog')
+        break
+      case 'settings':
+        // 触发设置
+        store.isOpenRightSlider = true
+        break
+      case 'about':
+        // 触发关于对话框
+        console.log('Open about dialog')
+        break
+    }
+  })
 })
 </script>
 

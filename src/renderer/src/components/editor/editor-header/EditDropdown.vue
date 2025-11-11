@@ -11,7 +11,9 @@ const { asSub } = toRefs(props)
 
 const { toggleShowInsertFormDialog, toggleShowUploadImgDialog, toggleShowInsertMpCardDialog } = useDisplayStore()
 
-const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
+// const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
+const store = useStore()
+const { isOpenPostSlider } = storeToRefs(store)
 </script>
 
 <template>
@@ -51,6 +53,10 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
         <ClipboardPasteIcon class="mr-2 h-4 w-4" />
         粘贴
       </MenubarItem> -->
+      <MenubarSeparator />
+      <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
+        内容管理
+      </MenubarCheckboxItem>
     </MenubarSubContent>
   </MenubarSub>
 
@@ -90,6 +96,10 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
         <ClipboardPasteIcon class="mr-2 h-4 w-4" />
         粘贴
       </MenubarItem> -->
+      <MenubarSeparator />
+      <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
+        内容管理
+      </MenubarCheckboxItem>
     </MenubarContent>
   </MenubarMenu>
 </template>
