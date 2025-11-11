@@ -200,7 +200,7 @@ async function copy() {
         <FileDropdown @open-editor-state="handleOpenEditorState" />
         <FormatDropdown />
         <EditDropdown />
-        <StyleDropdown />
+        <!-- <StyleDropdown /> -->
         <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
       </Menubar>
     </div>
@@ -267,7 +267,7 @@ async function copy() {
       <!-- <PostInfo class="hidden md:inline-flex" /> -->
 
       <!-- 编辑器设置按钮 -->
-      <Popover>
+      <!-- <Popover>
         <PopoverTrigger as-child>
           <Button variant="outline" size="icon" class="mr-1 h-8">
             <SlidersHorizontal class="size-4" />
@@ -276,7 +276,7 @@ async function copy() {
         <PopoverContent align="end">
           <ThemeCustomizer />
         </PopoverContent>
-      </Popover>
+      </Popover> -->
 
       <!-- 样式面板 -->
       <Button

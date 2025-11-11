@@ -173,6 +173,8 @@ export async function exportPureHTML(raw: string, title: string = `untitled`) {
  * @param {string} title - 文档标题
  */
 export function exportPDF(primaryColor: string, title: string = `untitled`) {
+  alert('暂不支持');
+  return;
   const htmlStr = processHtmlContent(primaryColor)
   const safeTitle = sanitizeTitle(title)
 

@@ -42,7 +42,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
         <Contact2Icon class="mr-2 h-4 w-4" />
         插入公众号名片
       </MenubarItem>
-      <MenubarSeparator />
+      <!-- <MenubarSeparator />
       <MenubarItem @click="copyToClipboard()">
         <CopyIcon class="mr-2 h-4 w-4" />
         复制
@@ -50,7 +50,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
       <MenubarItem @click="pasteFromClipboard()">
         <ClipboardPasteIcon class="mr-2 h-4 w-4" />
         粘贴
-      </MenubarItem>
+      </MenubarItem> -->
     </MenubarSubContent>
   </MenubarSub>
 
@@ -81,7 +81,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
         <Contact2Icon class="mr-2 h-4 w-4" />
         插入公众号名片
       </MenubarItem>
-      <MenubarSeparator />
+      <!-- <MenubarSeparator />
       <MenubarItem @click="copyToClipboard()">
         <CopyIcon class="mr-2 h-4 w-4" />
         复制
@@ -89,7 +89,7 @@ const { copyToClipboard, pasteFromClipboard, undo, redo } = useStore()
       <MenubarItem @click="pasteFromClipboard()">
         <ClipboardPasteIcon class="mr-2 h-4 w-4" />
         粘贴
-      </MenubarItem>
+      </MenubarItem> -->
     </MenubarContent>
   </MenubarMenu>
 </template>

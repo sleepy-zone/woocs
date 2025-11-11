@@ -67,7 +67,7 @@ function openEditorStateDialog() {
         <FileCog class="mr-2 size-4" />
         导入/导出项目配置
       </MenubarItem>
-      <MenubarSeparator />
+      <!-- <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isDark">
         深色模式
       </MenubarCheckboxItem>
@@ -78,7 +78,7 @@ function openEditorStateDialog() {
       <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
         内容管理
-      </MenubarCheckboxItem>
+      </MenubarCheckboxItem> -->
     </MenubarSubContent>
   </MenubarSub>
 
@@ -117,7 +117,7 @@ function openEditorStateDialog() {
         <FileCog class="mr-2 size-4" />
         导入/导出项目配置
       </MenubarItem>
-      <MenubarSeparator />
+      <!-- <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isDark">
         深色模式
       </MenubarCheckboxItem>
@@ -128,7 +128,7 @@ function openEditorStateDialog() {
       <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
         内容管理
-      </MenubarCheckboxItem>
+      </MenubarCheckboxItem> -->
     </MenubarContent>
   </MenubarMenu>
 </template>

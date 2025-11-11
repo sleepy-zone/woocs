@@ -10,12 +10,17 @@ import {
 } from '@md/shared/configs'
 import { X } from 'lucide-vue-next'
 import PickColors from 'vue-pick-colors'
-import { useStore } from '@/stores'
+import { useStore, useDisplayStore } from '@/stores'
 
 const store = useStore()
+const displayStore = useDisplayStore()
 
 // 控制是否启用动画
 const enableAnimation = ref(false)
+
+function customStyle() {
+  displayStore.toggleShowCssEditor()
+}
 
 // 监听 RightSlider 开关状态变化
 watch(() => store.isOpenRightSlider, () => {
@@ -239,6 +244,25 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         </div>
       </div>
       <div class="space-y-2">
+        <h2>统计字数和阅读时间</h2>
+        <div class="grid grid-cols-5 justify-items-center gap-2">
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': store.isCountStatus,
+            }" @click="!store.isCountStatus && store.countStatusChanged()"
+          >
+            开启
+          </Button>
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': !store.isCountStatus,
+            }" @click="store.isCountStatus && store.countStatusChanged()"
+          >
+            关闭
+          </Button>
+        </div>
+      </div>
+      <div class="space-y-2">
         <h2>段落首行缩进</h2>
         <div class="grid grid-cols-5 justify-items-center gap-2">
           <Button
@@ -252,6 +276,25 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
             class="w-full" variant="outline" :class="{
               'border-black dark:border-white border-2': !store.isUseIndent,
             }" @click="store.isUseIndent && store.useIndentChanged()"
+          >
+            关闭
+          </Button>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h2>自定义 CSS</h2>
+        <div class="grid grid-cols-5 justify-items-center gap-2">
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': displayStore.isShowCssEditor,
+            }" @click="!displayStore.isShowCssEditor && customStyle()"
+          >
+            开启
+          </Button>
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': !displayStore.isShowCssEditor,
+            }" @click="displayStore.isShowCssEditor && customStyle()"
           >
             关闭
           </Button>
@@ -273,6 +316,44 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
             }" @click="store.isUseJustify && store.useJustifyChanged()"
           >
             关闭
+          </Button>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h2>深色模式</h2>
+        <div class="grid grid-cols-5 justify-items-center gap-2">
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': store.isDark,
+            }" @click="store.isDark = true"
+          >
+            开启
+          </Button>
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': !store.isDark,
+            }" @click="store.isDark = false"
+          >
+            关闭
+          </Button>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h2>编辑区位置</h2>
+        <div class="grid grid-cols-5 justify-items-center gap-2">
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': store.isEditOnLeft,
+            }" @click="store.isEditOnLeft = true"
+          >
+            左侧
+          </Button>
+          <Button
+            class="w-full" variant="outline" :class="{
+              'border-black dark:border-white border-2': !store.isEditOnLeft,
+            }" @click="store.isEditOnLeft = false"
+          >
+            右侧
           </Button>
         </div>
       </div>

@@ -162,7 +162,7 @@ const formatItems = [
           </kbd>
         </MenubarShortcut>
       </MenubarCheckboxItem>
-      <MenubarSeparator />
+      <!-- <MenubarSeparator />
       <MenubarCheckboxItem
         :checked="isCiteStatus"
         @click="citeStatusChanged()"
@@ -175,7 +175,7 @@ const formatItems = [
         @click="countStatusChanged()"
       >
         统计字数和阅读时间
-      </MenubarCheckboxItem>
+      </MenubarCheckboxItem> -->
     </MenubarSubContent>
   </MenubarSub>
 
@@ -201,7 +201,7 @@ const formatItems = [
           </kbd>
         </MenubarShortcut>
       </MenubarCheckboxItem>
-      <MenubarSeparator />
+      <!-- <MenubarSeparator />
       <MenubarCheckboxItem
         :checked="isCiteStatus"
         @click="citeStatusChanged()"
@@ -214,7 +214,7 @@ const formatItems = [
         @click="countStatusChanged()"
       >
         统计字数和阅读时间
-      </MenubarCheckboxItem>
+      </MenubarCheckboxItem> -->
     </MenubarContent>
   </MenubarMenu>
 </template>
