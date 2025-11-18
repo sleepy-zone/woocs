@@ -26,7 +26,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
-    define: { process },
+    define: { 
+      process,
+      global: 'globalThis',
+    },
     envPrefix: [`VITE_`, `CF_`],
     plugins: [
       vue(),
@@ -36,7 +39,12 @@ export default defineConfig(({ mode }) => {
         launchEditor: env.VITE_LAUNCH_EDITOR ?? `code`,
       }),
       !isCfWorkers && nodePolyfills({
-        include: [`path`, `util`, `timers`, `stream`, `fs`],
+        include: [`path`, `util`, `timers`, `stream`, `fs`, `buffer`, `events`, `crypto`, `url`],
+        globals: {
+          Buffer: true,
+          global: true,
+          process: true,
+        },
         overrides: {
         // Since `fs` is not supported in browsers, we can use the `memfs` package to polyfill it.
         // fs: 'memfs',

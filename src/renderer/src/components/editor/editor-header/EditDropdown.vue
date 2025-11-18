@@ -53,10 +53,6 @@ const { isOpenPostSlider } = storeToRefs(store)
         <ClipboardPasteIcon class="mr-2 h-4 w-4" />
         粘贴
       </MenubarItem> -->
-      <MenubarSeparator />
-      <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
-        内容管理
-      </MenubarCheckboxItem>
     </MenubarSubContent>
   </MenubarSub>
 
@@ -96,10 +92,6 @@ const { isOpenPostSlider } = storeToRefs(store)
         <ClipboardPasteIcon class="mr-2 h-4 w-4" />
         粘贴
       </MenubarItem> -->
-      <MenubarSeparator />
-      <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
-        内容管理
-      </MenubarCheckboxItem>
     </MenubarContent>
   </MenubarMenu>
 </template>

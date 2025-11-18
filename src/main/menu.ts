@@ -15,15 +15,15 @@ const template = [
     ? [{
         label: app.name,
         submenu: [
-          {
-            label: 'About Woocs',
-            click: () => {
-              send2Render({
-                action: 'about'
-              })
-            }
-          },
-          { type: 'separator' },
+          // {
+          //   label: 'About Woocs',
+          //   click: () => {
+          //     send2Render({
+          //       action: 'about'
+          //     })
+          //   }
+          // },
+          // { type: 'separator' },
           {
             label: 'Settings',
             accelerator: 'CmdOrCtrl+,',
@@ -44,97 +44,97 @@ const template = [
         ]
       }]
     : []),
-  // { role: 'fileMenu' }
-  {
-    label: 'File',
-    submenu: [
-      {
-        label: '新建',
-        accelerator: 'CmdOrCtrl+N',
-        click: () => {
-          send2Render({
-            action: 'new-file'
-          })
-        }
-      },
-      {
-        label: '导入 .md',
-        accelerator: 'Shift+CmdOrCtrl+I',
-        click: () => {
-          send2Render({
-            action: 'import-md'
-          })
-        }
-      },
-      { type: 'separator' },
-      {
-        label: '导出 .md',
-        accelerator: 'CmdOrCtrl+E',
-        click: () => {
-          send2Render({
-            action: 'export-md'
-          })
-        }
-      },
-      {
-        label: '导出 .html',
-        accelerator: 'CmdOrCtrl+Shift+E',
-        click: () => {
-          send2Render({
-            action: 'export-html'
-          })
-        }
-      },
-      {
-        label: '导出 .html（无样式）',
-        click: () => {
-          send2Render({
-            action: 'export-pure-html'
-          })
-        }
-      },
-      {
-        label: '导出 .pdf',
-        accelerator: 'CmdOrCtrl+P',
-        click: () => {
-          send2Render({
-            action: 'export-pdf'
-          })
-        }
-      },
-      {
-        label: '导出 .png',
-        click: () => {
-          send2Render({
-            action: 'export-png'
-          })
-        }
-       },
-      { type: 'separator' },
-      {
-        label: '导入/导出项目配置',
-        click: () => {
-          send2Render({
-            action: 'editor-state'
-          })
-        }
-      },
-      { type: 'separator' },
-      isMac ? { role: 'close' } : { role: 'quit' },
-      ...(
-        isMac ?
-        [] :
-        [{
-          label: '偏好设置',
-          click: () => {
-            send2Render({
-              action: 'settings'
-            })
-          }
-        },]
-      )
-    ]
-  },
+  { role: 'fileMenu' },
+  // {
+  //   label: 'File',
+  //   submenu: [
+  //     {
+  //       label: '新建',
+  //       accelerator: 'CmdOrCtrl+N',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'new-file'
+  //         })
+  //       }
+  //     },
+  //     {
+  //       label: '导入 .md',
+  //       accelerator: 'Shift+CmdOrCtrl+I',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'import-md'
+  //         })
+  //       }
+  //     },
+  //     { type: 'separator' },
+  //     {
+  //       label: '导出 .md',
+  //       accelerator: 'CmdOrCtrl+E',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'export-md'
+  //         })
+  //       }
+  //     },
+  //     {
+  //       label: '导出 .html',
+  //       accelerator: 'CmdOrCtrl+Shift+E',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'export-html'
+  //         })
+  //       }
+  //     },
+  //     {
+  //       label: '导出 .html（无样式）',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'export-pure-html'
+  //         })
+  //       }
+  //     },
+  //     {
+  //       label: '导出 .pdf',
+  //       accelerator: 'CmdOrCtrl+P',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'export-pdf'
+  //         })
+  //       }
+  //     },
+  //     {
+  //       label: '导出 .png',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'export-png'
+  //         })
+  //       }
+  //      },
+  //     { type: 'separator' },
+  //     {
+  //       label: '导入/导出项目配置',
+  //       click: () => {
+  //         send2Render({
+  //           action: 'editor-state'
+  //         })
+  //       }
+  //     },
+  //     { type: 'separator' },
+  //     isMac ? { role: 'close' } : { role: 'quit' },
+  //     ...(
+  //       isMac ?
+  //       [] :
+  //       [{
+  //         label: '偏好设置',
+  //         click: () => {
+  //           send2Render({
+  //             action: 'settings'
+  //           })
+  //         }
+  //       },]
+  //     )
+  //   ]
+  // },
   // { role: 'editMenu' }
   {
     label: 'Edit',

@@ -74,11 +74,11 @@ function openEditorStateDialog() {
       <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isEditOnLeft">
         左侧编辑
-      </MenubarCheckboxItem>
+      </MenubarCheckboxItem> -->
       <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
         内容管理
-      </MenubarCheckboxItem> -->
+      </MenubarCheckboxItem>
     </MenubarSubContent>
   </MenubarSub>
 
@@ -117,18 +117,18 @@ function openEditorStateDialog() {
         <FileCog class="mr-2 size-4" />
         导入/导出项目配置
       </MenubarItem>
-      <!-- <MenubarSeparator />
-      <MenubarCheckboxItem v-model:checked="isDark">
+      <MenubarSeparator />
+      <!-- <MenubarCheckboxItem v-model:checked="isDark">
         深色模式
       </MenubarCheckboxItem>
       <MenubarSeparator />
       <MenubarCheckboxItem v-model:checked="isEditOnLeft">
         左侧编辑
       </MenubarCheckboxItem>
-      <MenubarSeparator />
+      <MenubarSeparator /> -->
       <MenubarCheckboxItem v-model:checked="isOpenPostSlider">
         内容管理
-      </MenubarCheckboxItem> -->
+      </MenubarCheckboxItem>
     </MenubarContent>
   </MenubarMenu>
 </template>
