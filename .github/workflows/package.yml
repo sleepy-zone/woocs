@@ -17,13 +17,15 @@ jobs:
     - name: Install pnpm
       uses: pnpm/action-setup@v3
       with:
-        version: 9
+        version: 10
     - uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
         cache: 'pnpm'
     - run: pnpm install
     - run: pnpm run build:linux
+      env:
+        NODE_OPTIONS: "--experimental-global-webcrypto"
     - uses: actions/upload-artifact@v4
       with:
         name: linux
@@ -38,13 +40,15 @@ jobs:
     - name: Install pnpm
       uses: pnpm/action-setup@v3
       with:
-        version: 9
+        version: 10
     - uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
         cache: 'pnpm'
     - run: pnpm install
     - run: pnpm build:mac
+      env:
+        NODE_OPTIONS: "--experimental-global-webcrypto"
     - uses: actions/upload-artifact@v4
       with:
         name: macos
@@ -58,13 +62,15 @@ jobs:
     - name: Install pnpm
       uses: pnpm/action-setup@v3
       with:
-        version: 9
+        version: 10
     - uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
         cache: 'pnpm'
     - run: pnpm install
     - run: pnpm run build:win
+      env:
+        NODE_OPTIONS: "--experimental-global-webcrypto"
     - uses: actions/upload-artifact@v4
       with:
         name: windows
