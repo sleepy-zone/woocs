@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
         // Since `fs` is not supported in browsers, we can use the `memfs` package to polyfill it.
         // fs: 'memfs',
         },
+        protocolImports: true,
       }),
       VitePluginRadar({
         analytics: { id: `G-7NZL3PZ0NK` },
@@ -73,12 +74,15 @@ export default defineConfig(({ mode }) => {
     css: { devSourcemap: true },
     build: {
       rollupOptions: {
-        external: [`mermaid`],
+        external: [`mermaid`, `undici`],
         output: {
           chunkFileNames: `static/js/md-[name]-[hash].js`,
           entryFileNames: `static/js/md-[name]-[hash].js`,
           assetFileNames: `static/[ext]/md-[name]-[hash].[ext]`,
-          globals: { mermaid: `mermaid` },
+          globals: { 
+            mermaid: `mermaid`,
+            undici: `undici`,
+          },
           manualChunks(id) {
             if (id.includes(`node_modules`)) {
               if (id.includes(`katex`))

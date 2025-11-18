@@ -1,6 +1,6 @@
 {
   "name": "woocs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "基于 doocs/md 开发的微信 Markdown 编辑器桌面应用",
   "main": "./out/main/index.js",
   "author": "sleepy-zone",
